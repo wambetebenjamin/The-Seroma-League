@@ -22,6 +22,14 @@
       <!-- 3D canvas mounts here -->
       <div id="stage"></div>
 
+      <!-- menu backdrop: a campus 3D render that swaps with the chosen venue -->
+      <div id="backdrop" class="backdrop" aria-hidden="true">
+        <div class="bd-layer" id="bdA"></div>
+        <div class="bd-layer" id="bdB"></div>
+        <div class="bd-vignette"></div>
+        <div class="bd-grain"></div>
+      </div>
+
       <!-- In-game HUD -->
       <div id="hud" class="hidden">
         <div class="hud-top">
@@ -115,6 +123,18 @@
       <!-- Menus -->
       <div id="ui" class="ui">
         <section class="screen active" id="screen-home">
+          <!-- broadcast venue switcher: each tab swaps the full-bleed backdrop -->
+          <div class="hub-topbar">
+            <div class="hub-brand glass">
+              <span class="hub-crest">SCHS</span>
+              <div>
+                <h2>THE SEROMA LEAGUE</h2>
+                <p>SEROMA CHRISTIAN HIGH SCHOOL · MUKONO</p>
+              </div>
+            </div>
+            <nav class="venue-tabs glass" id="venueTabs" aria-label="Venue"></nav>
+          </div>
+
           <div class="home-hero">
             <img src="./img/hero.jpg" alt="Seroma athletes gathering on the games field, rendered in 3D" />
             <div class="scrim"></div>
@@ -129,12 +149,15 @@
                 <button class="btn primary" id="playNow">PLAY NOW ⚡</button>
                 <button class="btn ghost" id="howBtn">HOW TO PLAY</button>
               </div>
+              <p class="venue-caption" id="venueCaption"></p>
               <div class="home-meta">
                 <span>12 clubs</span><span>6 award races</span><span>3 sports</span>
               </div>
             </div>
           </div>
           <div class="home-scroll">
+            <!-- floating strip of the 3D renders; tap one to make it the backdrop -->
+            <aside class="render-strip glass" id="renderStrip" aria-label="Campus renders"></aside>
             <div class="cards-row" id="sportCards"></div>
             <div class="split">
               <div class="panel campus-panel">

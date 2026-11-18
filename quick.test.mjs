@@ -3,7 +3,17 @@
  * own kit colours, and the ratings shown on the club cards must be sane and
  * derived from the poll data.
  */
-import { TEAMS, POLL_CATEGORIES, clubRatings, clubOverall } from './src/data/seroma.js';
+import { existsSync } from 'node:fs';
+import {
+  TEAMS,
+  POLL_CATEGORIES,
+  clubRatings,
+  clubOverall,
+  VENUES,
+  GALLERY,
+  venueFor,
+  venueForSport,
+} from './src/data/seroma.js';
 import { crestSVG, kitSwatch } from './src/ui/crest.js';
 
 let pass = 0;
@@ -57,6 +67,20 @@ ok('overall is the mean of the four ratings', TEAMS.every((t) => {
 }));
 ok('overall is a 55-95 integer', TEAMS.every((t) => Number.isInteger(clubOverall(t.id)) && clubOverall(t.id) >= 55 && clubOverall(t.id) <= 95));
 ok('poll categories still drive the ratings', POLL_CATEGORIES.length > 0);
+
+/* ------------------------------ hub backdrops ----------------------------- */
+ok('there are four hub venues', VENUES.length === 4, `got ${VENUES.length}`);
+ok('every venue has a 3D render that exists on disk', VENUES.every((v) => existsSync('public/' + v.photo)), VENUES.map((v) => v.photo).join(','));
+ok('every gallery render exists on disk', GALLERY.every((g) => existsSync('public/' + g.photo)));
+ok('every venue has copy for the caption', VENUES.every((v) => v.name && v.line && v.icon));
+const hosted = VENUES.filter((v) => v.sport).map((v) => v.sport).sort();
+ok('each sport has a venue', JSON.stringify(hosted) === JSON.stringify(['basketball', 'football', 'swimming']));
+ok('venueForSport finds the pitch for football', venueForSport('football').id === 'jubilee');
+ok('venueForSport then basketball', venueForSport('basketball').id === 'courts');
+ok('venueForSport then swimming', venueForSport('swimming').id === 'aquatics');
+ok('unknown sport falls back to a venue', Boolean(venueForSport('cricket')));
+ok('venueFor returns a venue for an unknown id', Boolean(venueFor('nowhere')));
+ok('gallery thumbnails are all labelled', GALLERY.every((g) => g.label && g.alt));
 
 console.log('');
 if (fail) {

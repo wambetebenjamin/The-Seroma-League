@@ -375,3 +375,60 @@ export function clubOverall(id) {
   if (!r) return 70;
   return Math.round((r.speed + r.power + r.stamina + r.defence) / 4);
 }
+
+/**
+ * The four venue "sets" the broadcast hub can switch between. Each one pairs a
+ * 3D render of campus with the sports that play there, so the menu reacts when
+ * you pick a sport instead of being a static picture.
+ */
+export const VENUES = [
+  {
+    id: 'jubilee',
+    name: 'Jubilee Pitch',
+    icon: '⚽',
+    sport: 'football',
+    photo: 'img/stadium.jpg',
+    photoAlt: 'Seroma stadium, grandstand and running track, 3D render',
+    line: 'Stone terraces, red running track, the roar from both ends.',
+  },
+  {
+    id: 'courts',
+    name: 'Courts & Terraces',
+    icon: '🏀',
+    sport: 'basketball',
+    photo: 'img/ballgames.jpg',
+    photoAlt: 'Ball games day at Seroma, 3D render',
+    line: 'Outdoor courts on games day, the whole school lining the terrace.',
+  },
+  {
+    id: 'aquatics',
+    name: 'Aquatic Lane',
+    icon: '🏊',
+    sport: 'swimming',
+    photo: 'img/swimmers.jpg',
+    photoAlt: 'Seroma swimmers with their medals, 3D render',
+    line: 'Fifty metres of blue, national-title water.',
+  },
+  {
+    id: 'wisdom',
+    name: 'Wisdom Hall',
+    icon: '🏆',
+    sport: null,
+    photo: 'img/wisdom-hall.jpg',
+    photoAlt: 'Wisdom Hall at Seroma, 3D render',
+    line: 'Awards night, where the poll decides who takes the honours.',
+  },
+];
+
+/** The gallery strip on the hub: every set we have a 3D render of. */
+export const GALLERY = [
+  { id: 'wisdom', photo: 'img/wisdom-hall.jpg', label: 'Wisdom Hall', alt: 'Wisdom Hall at Seroma, 3D render' },
+  { id: 'jubilee', photo: 'img/stadium.jpg', label: 'Grandstand & Track', alt: 'Seroma stadium grandstand and running track, 3D render' },
+  { id: 'aerial', photo: 'img/aerial.jpg', label: 'Campus Aerial', alt: 'Aerial view of the Seroma campus, 3D render' },
+  { id: 'students', photo: 'img/campus.jpg', label: 'Student Stands', alt: 'Seroma students together on campus, 3D render' },
+  { id: 'courts', photo: 'img/ballgames.jpg', label: 'Ball Games Day', alt: 'Ball games day at Seroma, 3D render' },
+  { id: 'awards', photo: 'img/celebration.jpg', label: 'Awards Night', alt: 'Seroma team lifting the trophy, 3D render' },
+];
+
+export const venueFor = (id) => VENUES.find((v) => v.id === id) || VENUES[0];
+export const venueForSport = (sport) => VENUES.find((v) => v.sport === sport) || VENUES[0];
