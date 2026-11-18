@@ -32,13 +32,55 @@ function hash01(str, salt = 0) {
   return ((h >>> 0) % 10000) / 10000;
 }
 
+/**
+ * Two players in the same kit on the same pitch read as clones, so a second
+ * team sharing a colour gets a clearly different alternate kit instead.
+ */
+const LIGHT_ALT = [
+  { primary: '#f4f1e6', secondary: '#1f2a33', shorts: '#1f2a33' },
+  { primary: '#ffd166', secondary: '#20303a', shorts: '#20303a' },
+  { primary: '#9fd8ff', secondary: '#15202a', shorts: '#15202a' },
+  { primary: '#ffe9c9', secondary: '#7a2e1d', shorts: '#7a2e1d' },
+];
+const DARK_ALT = [
+  { primary: '#22303c', secondary: '#f2efe4', shorts: '#f2efe4' },
+  { primary: '#3b2540', secondary: '#f6d98a', shorts: '#f6d98a' },
+  { primary: '#14303a', secondary: '#ffd166', shorts: '#ffd166' },
+  { primary: '#2d1f18', secondary: '#ffe0b8', shorts: '#ffe0b8' },
+];
+
+function colourValue(hex) {
+  const h = String(hex || '#888888').replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6);
+  const n = parseInt(full, 16) || 0;
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Deterministic alternate strip that still reads as "that club". */
+export function alternateKit(team, seed = 0) {
+  const base = team?.colors?.primary || '#2f6b45';
+  const light = colourValue(base) < 0.22;
+  const pool = light ? LIGHT_ALT : DARK_ALT;
+  const pick = pool[Math.floor(hash01(team?.id || 'seroma', seed) * pool.length) % pool.length];
+  return { ...pick, alternate: true, base };
+}
+
 export class Avatar {
-  constructor({ team, name, number = 7, sport = 'football', isKeeper = false }) {
+  constructor({ team, name, number = 7, sport = 'football', isKeeper = false, alt = null }) {
     this.team = team;
     this.name = name || team.name;
     this.number = number;
     this.sport = sport;
     this.isKeeper = isKeeper;
+    this.alt = alt;
+    // the kit we are actually wearing: the change strip if the colours clash,
+    // and keeper green between the posts
+    this.kitColors = isKeeper
+      ? { primary: '#25a35c', secondary: '#f7f7f2', shorts: '#1a1a1a', keeper: true }
+      : alt || team.colors;
     this.group = new THREE.Group();
     this.group.userData.avatar = this;
     this.speed = 0;
@@ -46,9 +88,7 @@ export class Avatar {
   }
 
   _build() {
-    const kit = this.isKeeper
-      ? { primary: '#25a35c', secondary: '#f7f7f2', shorts: '#1a1a1a' }
-      : this.team.colors;
+    const kit = this.kitColors;
     const shirt = new THREE.MeshStandardMaterial({
       color: new THREE.Color(kit.primary),
       roughness: 0.86,
@@ -285,7 +325,7 @@ export class Avatar {
     });
 
     // grounding blob shadow (phones have the shadow map switched off)
-    this.shadow = addContactShadow(this.group, 0.62, 0.8);
+    this.shadow = addContactShadow(this.group, 0.34, 0.5);
   }
 
   _hairStyle() {

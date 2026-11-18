@@ -9,3 +9,6 @@ image-search/
 tools/portraits.png
 tools/crowd.png
 tools/crowd-calm.png
+
+# dev-only scene renders
+tools/shot-*.png
