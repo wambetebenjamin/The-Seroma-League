@@ -5,8 +5,6 @@
 import * as THREE from 'three';
 import {
   createRenderer,
-  makeSky,
-  makeLights,
   disposeScene,
   clamp,
   lerp,
@@ -15,6 +13,7 @@ import {
   fmtTime,
   IS_TOUCH,
 } from '../core/engine.js';
+import { makeCloudSky, makeRenderLights, applyRenderLook, addHills, addHedge } from '../core/style.js';
 import { courtTexture, crowdTexture, bannerTexture, dirtTexture } from '../core/textures.js';
 import {
   addTreeLine,
@@ -71,8 +70,8 @@ export class BasketballGame {
   async init() {
     const scene = this.scene;
     scene.fog = new THREE.Fog(0xc4dcec, 80, 260);
-    scene.add(makeSky('#2b6ea8', '#a9d3ea', '#f1e3c3'));
-    makeLights(scene);
+    scene.add(makeCloudSky());
+    this.lights = makeRenderLights(scene);
     this._buildCourt();
     this._spawnPlayers();
     this._buildBall();
@@ -85,7 +84,7 @@ export class BasketballGame {
     const scene = this.scene;
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(140, 140),
-      new THREE.MeshStandardMaterial({ map: dirtTexture([24, 24]), roughness: 1 })
+      new THREE.MeshStandardMaterial({ map: dirtTexture([18, 18]), color: 0xd08a5c, roughness: 0.95 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -93,12 +92,17 @@ export class BasketballGame {
 
     const court = new THREE.Mesh(
       new THREE.PlaneGeometry(COURT.halfW * 2, COURT.halfL * 2),
-      new THREE.MeshStandardMaterial({ map: courtTexture(), roughness: 0.95 })
+      new THREE.MeshStandardMaterial({ map: courtTexture(), color: 0xffd9b8, roughness: 0.8 })
     );
     court.rotation.x = -Math.PI / 2;
     court.position.y = 0.02;
     court.receiveShadow = true;
     scene.add(court);
+
+    addHills(scene, { radius: 170, count: 16 });
+    addHedge(scene, 0, -COURT.halfL - 3.5, { w: 22 });
+    addHedge(scene, -COURT.halfW - 4, 0, { w: 18, rot: Math.PI / 2 });
+    addHedge(scene, COURT.halfW + 4, 0, { w: 18, rot: Math.PI / 2 });
 
     // three point arc + key
     const lineMat = new THREE.MeshBasicMaterial({ color: 0xfff6e0, transparent: true, opacity: 0.9 });
@@ -214,6 +218,7 @@ export class BasketballGame {
   _resize() {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
+    applyRenderLook(this.renderer);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();

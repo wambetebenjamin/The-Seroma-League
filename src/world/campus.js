@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { roofTexture, crowdTexture, bannerTexture, dirtTexture } from '../core/textures.js';
 import { rand, pick } from '../core/engine.js';
 import { SCHOOL } from '../data/seroma.js';
+import { PALETTE, stdMat, glossyMat, addContactShadow, addHedge } from '../core/style.js';
 
 const MAT = {};
 function mat(key, make) {
@@ -15,23 +16,22 @@ function mat(key, make) {
 }
 
 export function terracottaWall() {
-  return mat('terracotta', () => new THREE.MeshStandardMaterial({ color: 0xcf6a37, roughness: 0.92 }));
+  return mat('terracotta', () => stdMat(PALETTE.terracotta, { roughness: 0.78 }));
 }
 export function creamWall() {
-  return mat('cream', () => new THREE.MeshStandardMaterial({ color: 0xe8ddc4, roughness: 0.95 }));
+  return mat('cream', () => stdMat(PALETTE.cream, { roughness: 0.82 }));
 }
 export function greenRoof() {
+  // smooth painted metal sheeting, the way the renders show the roofs
   return mat('roof', () =>
-    new THREE.MeshStandardMaterial({ map: roofTexture([6, 2]), color: 0x8fbf9f, roughness: 0.8 })
+    stdMat(PALETTE.roofGreen, { roughness: 0.42, metalness: 0.16, map: roofTexture([8, 2]) })
   );
 }
 export function concrete() {
-  return mat('concrete', () => new THREE.MeshStandardMaterial({ color: 0xbfb6a5, roughness: 1 }));
+  return mat('concrete', () => stdMat(PALETTE.concrete, { roughness: 0.86 }));
 }
 export function darkGlass() {
-  return mat('glass', () =>
-    new THREE.MeshStandardMaterial({ color: 0x22404a, roughness: 0.25, metalness: 0.5 })
-  );
+  return mat('glass', () => glossyMat(PALETTE.glass, { roughness: 0.14, metalness: 0.62 }));
 }
 
 let treeGeoCache = null;
@@ -40,17 +40,18 @@ function treeGeometries() {
   treeGeoCache = {
     trunk: new THREE.CylinderGeometry(0.28, 0.42, 7, 6),
     palmTrunk: new THREE.CylinderGeometry(0.2, 0.34, 9, 6),
-    canopy: new THREE.IcosahedronGeometry(2.6, 0),
+    canopy: new THREE.IcosahedronGeometry(2.6, 1),
     palmLeaf: new THREE.ConeGeometry(1.5, 4.2, 4, 1, true),
   };
   return treeGeoCache;
 }
 
-const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4f33, roughness: 1 });
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5334, roughness: 0.9 });
+// rounded, bright canopies like the promo renders: smooth shading, no flat facets
 const leafMats = [
-  new THREE.MeshStandardMaterial({ color: 0x2f6b2c, roughness: 1, flatShading: true }),
-  new THREE.MeshStandardMaterial({ color: 0x3c7d33, roughness: 1, flatShading: true }),
-  new THREE.MeshStandardMaterial({ color: 0x27562a, roughness: 1, flatShading: true }),
+  new THREE.MeshStandardMaterial({ color: 0x4b9c3c, roughness: 0.84 }),
+  new THREE.MeshStandardMaterial({ color: 0x5cad44, roughness: 0.84 }),
+  new THREE.MeshStandardMaterial({ color: 0x3d8834, roughness: 0.84 }),
 ];
 
 export function addEucalyptus(scene, x, z, scale = 1) {
@@ -67,6 +68,7 @@ export function addEucalyptus(scene, x, z, scale = 1) {
   }
   grp.position.set(x, 0, z);
   grp.scale.setScalar(scale);
+  addContactShadow(grp, 2.1 * scale, 0.5).position.y = 0.03;
   scene.add(grp);
   return grp;
 }
@@ -102,16 +104,38 @@ export function addClassroomBlock(scene, x, z, { w = 26, d = 9, h = 6.5, rot = 0
   body.receiveShadow = true;
   grp.add(body);
 
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.hypot(w, d) * 0.62, 3.2, 4), greenRoof());
-  roof.position.y = h + 1.4;
+  // hipped roof: a four-sided cone with softened normals and a ridge cap
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.hypot(w, d) * 0.62, 2.9, 4), greenRoof());
+  roof.position.y = h + 1.3;
   roof.rotation.y = Math.PI / 4;
   roof.scale.set(w / Math.hypot(w, d), 1, d / Math.hypot(w, d));
+  roof.castShadow = true;
   grp.add(roof);
+  const eave = new THREE.Mesh(
+    new THREE.BoxGeometry(w + 1.1, 0.26, d + 1.1),
+    stdMat(PALETTE.roofGreenDeep, { roughness: 0.5, metalness: 0.12 })
+  );
+  eave.position.y = h + 0.05;
+  grp.add(eave);
 
   // veranda / window band
   const band = new THREE.Mesh(new THREE.BoxGeometry(w * 0.94, h * 0.34, 0.2), darkGlass());
   band.position.set(0, h * 0.58, d / 2 + 0.06);
   grp.add(band);
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(w * 0.96, h * 0.4, 0.12),
+    stdMat(0xf2efe6, { roughness: 0.7 })
+  );
+  frame.position.set(0, h * 0.58, d / 2 + 0.002);
+  grp.add(frame);
+  // window mullions so the glazing reads as panes, not a black slab
+  const mullionMat = stdMat(0xeeeae0, { roughness: 0.7 });
+  const panes = Math.max(3, Math.round(w / 3.2));
+  for (let i = 1; i < panes; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, h * 0.34, 0.1), mullionMat);
+    m.position.set(-w / 2 + 0.5 + (i * (w - 1)) / panes, h * 0.58, d / 2 + 0.14);
+    grp.add(m);
+  }
   const columns = Math.max(3, Math.round(w / 2.6));
   const colMat = concrete();
   for (let i = 0; i < columns; i++) {
@@ -125,6 +149,7 @@ export function addClassroomBlock(scene, x, z, { w = 26, d = 9, h = 6.5, rot = 0
 
   grp.position.set(x, 0, z);
   grp.rotation.y = rot;
+  addContactShadow(grp, Math.max(w, d) * 0.62, 0.55);
   scene.add(grp);
   return grp;
 }
@@ -141,7 +166,7 @@ export function addTerraces(scene, x, z, { steps = 6, width = 34, rot = 0, rise 
     grp.add(s);
     const lip = new THREE.Mesh(
       new THREE.BoxGeometry(width, 0.12, run * 0.92),
-      new THREE.MeshStandardMaterial({ color: 0xd9a273, roughness: 0.9 })
+      stdMat('#e0a877', { roughness: 0.82 })
     );
     lip.position.set(0, rise * (i + 1) - 0.05, -i * run);
     grp.add(lip);
@@ -162,7 +187,7 @@ export function addGrandstand(scene, x, z, rot = 0, length = 46, colors = ['#c03
   for (let i = 0; i < steps; i++) {
     const step = new THREE.Mesh(
       new THREE.BoxGeometry(length, 0.8, 1.3),
-      new THREE.MeshStandardMaterial({ color: 0xb9b2a4, roughness: 1 })
+      stdMat(PALETTE.concrete, { roughness: 0.85 })
     );
     step.position.set(0, 0.4 + i * 0.8, -i * 1.3);
     step.receiveShadow = true;
@@ -267,7 +292,7 @@ export function addFloodlight(scene, x, z) {
   const grp = new THREE.Group();
   const pole = new THREE.Mesh(
     new THREE.CylinderGeometry(0.22, 0.3, 20, 8),
-    new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.6, roughness: 0.5 })
+    glossyMat(0xb9bfc6, { roughness: 0.4, metalness: 0.5 })
   );
   pole.position.y = 10;
   grp.add(pole);

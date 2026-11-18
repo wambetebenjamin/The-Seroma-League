@@ -5,8 +5,6 @@
 import * as THREE from 'three';
 import {
   createRenderer,
-  makeSky,
-  makeLights,
   disposeScene,
   clamp,
   lerp,
@@ -14,6 +12,7 @@ import {
   fmtTime,
   IS_TOUCH,
 } from '../core/engine.js';
+import { makeCloudSky, makeRenderLights, applyRenderLook, addHills, addHedge } from '../core/style.js';
 import { waterTexture, bannerTexture, crowdTexture } from '../core/textures.js';
 import { addTreeLine, addGrandstand, addClassroomBlock, addSchoolSign, addPalm } from '../world/campus.js';
 import { teamById, squadFor } from '../data/seroma.js';
@@ -65,8 +64,8 @@ export class SwimmingGame {
   async init() {
     const scene = this.scene;
     scene.fog = new THREE.Fog(0xcfe6ef, 60, 220);
-    scene.add(makeSky('#1f6fae', '#a9d9ee', '#eef0d9'));
-    makeLights(scene, 1.05);
+    scene.add(makeCloudSky());
+    this.lights = makeRenderLights(scene, 1.05);
     this._buildPool();
     this._buildRivals();
     this._resize();
@@ -76,12 +75,15 @@ export class SwimmingGame {
 
   _buildPool() {
     const scene = this.scene;
-    const deckMat = new THREE.MeshStandardMaterial({ color: 0xdcd3c2, roughness: 0.9 });
+    const deckMat = new THREE.MeshStandardMaterial({ color: 0xe4dac6, roughness: 0.78 });
     const deck = new THREE.Mesh(new THREE.PlaneGeometry(120, 160), deckMat);
     deck.rotation.x = -Math.PI / 2;
     deck.position.y = -0.05;
     deck.receiveShadow = true;
     scene.add(deck);
+
+    addHills(scene, { radius: 150, count: 14, colors: ['#8bbd63', '#9ecb74', '#7cab56'] });
+    addHedge(scene, 0, 12, { w: 30, color: '#3f8b3a' });
 
     // pool shell
     const width = LANES * LANE_W;
@@ -209,6 +211,7 @@ export class SwimmingGame {
   _resize() {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
+    applyRenderLook(this.renderer);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();

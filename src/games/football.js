@@ -5,8 +5,6 @@
 import * as THREE from 'three';
 import {
   createRenderer,
-  makeSky,
-  makeLights,
   disposeScene,
   clamp,
   lerp,
@@ -17,6 +15,7 @@ import {
   fmtTime,
   IS_TOUCH,
 } from '../core/engine.js';
+import { makeCloudSky, makeRenderLights, applyRenderLook, addHills, addHedge } from '../core/style.js';
 import {
   grassTexture,
   dirtTexture,
@@ -191,8 +190,8 @@ export class FootballGame {
   async init() {
     const scene = this.scene;
     scene.fog = new THREE.Fog(0xbcd6e6, 90, 300);
-    scene.add(makeSky('#2a6fa8', '#a9d3ea', '#f2e4c4'));
-    this.lights = makeLights(scene);
+    scene.add(makeCloudSky());
+    this.lights = makeRenderLights(scene);
     this._buildStadium();
     this.ball = new Ball(scene);
     this.ball.getOwnerState = (o) => this._ownerState(o);
@@ -207,10 +206,10 @@ export class FootballGame {
     const scene = this.scene;
     const { halfW, halfL } = PITCH;
 
-    // ground: red-earth surround + grass pitch
+    // ground: red-earth surround + grass pitch (same palette as the renders)
     const surround = new THREE.Mesh(
       new THREE.PlaneGeometry(150, 150),
-      new THREE.MeshStandardMaterial({ map: dirtTexture([26, 26]), roughness: 1 })
+      new THREE.MeshStandardMaterial({ map: dirtTexture([18, 18]), color: 0xd08a5c, roughness: 0.95 })
     );
     surround.rotation.x = -Math.PI / 2;
     surround.receiveShadow = true;
@@ -218,7 +217,7 @@ export class FootballGame {
 
     const pitch = new THREE.Mesh(
       new THREE.PlaneGeometry(halfW * 2, halfL * 2, 1, 1),
-      new THREE.MeshStandardMaterial({ map: grassTexture([8, 11]), roughness: 1 })
+      new THREE.MeshStandardMaterial({ map: grassTexture([7, 10]), color: 0xbfe08f, roughness: 0.92 })
     );
     pitch.rotation.x = -Math.PI / 2;
     pitch.position.y = 0.02;
@@ -289,7 +288,13 @@ export class FootballGame {
     addClassroomBlock(scene, halfW + 36, 24, { w: 26, d: 9, h: 6.4, rot: -0.4, wall: 'cream' });
     addClassroomBlock(scene, -halfW - 30, 34, { w: 22, d: 8, h: 6, rot: -0.6 });
 
+    addHills(scene, { radius: 190, count: 18 });
     addTreeLine(scene, 0, 0, 70, 30);
+    // planted beds framing the pitch, like the renders
+    [-1, 1].forEach((sx) => {
+      addHedge(scene, sx * (halfW + 3.6), -halfL + 6, { w: 14, rot: Math.PI / 2 });
+      addHedge(scene, sx * (halfW + 3.6), halfL - 6, { w: 14, rot: Math.PI / 2 });
+    });
     addPerimeterWall(scene, 0, 0, 96);
     addSchoolSign(scene, 0, -halfL - 22, 0);
     [-1, 1].forEach((sx) =>
@@ -404,6 +409,7 @@ export class FootballGame {
   _resize() {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
+    applyRenderLook(this.renderer);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
