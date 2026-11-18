@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Input } from './core/input.js';
 import { audio } from './core/audio.js';
 import { portraitURL } from './ui/portrait.js';
+import { crestSVG } from './ui/crest.js';
 import { hideLoader, showLoader, showToast } from './ui/hud.js';
 import { Hud } from './ui/hud.js';
 import {
@@ -14,6 +15,8 @@ import {
   squadFor,
   teamById,
   SQUADS,
+  clubRatings,
+  clubOverall,
 } from './data/seroma.js';
 import { FootballGame } from './games/football.js';
 import { BasketballGame } from './games/basketball.js';
@@ -45,9 +48,11 @@ function show(screenId) {
 function showHud() {
   app.ui.classList.add('hidden');
   app.hud.classList.remove('hidden');
+  document.body.classList.add('match-on');
 }
 function hideHud() {
   app.hud.classList.add('hidden');
+  document.body.classList.remove('match-on');
 }
 function toast(msg) {
   showToast(msg);
@@ -107,6 +112,182 @@ function buildHome() {
 
   document.getElementById('pollLink').href = SCHOOL.poll;
   document.getElementById('year').textContent = new Date().getFullYear();
+}
+
+/* -------------------------------- quick play ------------------------------- */
+/**
+ * Three taps: sport -> club -> mode. Nothing else in the way, no scrolling past
+ * the campus lore, and the club cards carry real ratings so the choice feels
+ * strategic.
+ */
+const quick = { step: 'sport', sport: null, club: null, mode: 'match' };
+
+const QUICK_STEPS = ['sport', 'club', 'mode'];
+
+function openQuick(sport = null) {
+  quick.step = sport ? 'club' : 'sport';
+  quick.sport = sport;
+  quick.club = null;
+  quick.mode = app.mode || 'match';
+  renderQuick();
+  show('screen-quick');
+}
+
+function setQuickStep(step) {
+  quick.step = step;
+  renderQuick();
+}
+
+function renderQuick() {
+  const e = (id) => document.getElementById(id);
+  const steps = e('quickSteps');
+  steps.querySelectorAll('li').forEach((li) => {
+    const name = li.dataset.step;
+    const idx = QUICK_STEPS.indexOf(name);
+    const cur = QUICK_STEPS.indexOf(quick.step);
+    li.classList.toggle('on', name === quick.step);
+    li.classList.toggle('done', idx < cur);
+  });
+
+  document.querySelectorAll('.quick-pane').forEach((p) => {
+    p.hidden = p.dataset.pane !== quick.step;
+  });
+
+  const stage = document.querySelector('#screen-quick .quick');
+  stage.dataset.step = quick.step;
+
+  /* ------------------------------ 1. sport ------------------------------ */
+  const sports = e('quickSports');
+  if (sports && !sports.dataset.built) {
+    sports.innerHTML = SPORTS.map(
+      (sp) => `<button class="quick-sport" data-sport="${sp.id}">
+        <span class="qs-emoji">${sp.icon}</span>
+        <b>${sp.name}</b>
+        <span>${sp.tagline}</span>
+      </button>`
+    ).join('');
+    sports.dataset.built = '1';
+    sports.querySelectorAll('[data-sport]').forEach((b) => {
+      b.onclick = () => {
+        audio.click();
+        quick.sport = b.dataset.sport;
+        setQuickStep('club');
+      };
+    });
+  }
+  if (sports) {
+    sports.querySelectorAll('[data-sport]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.sport === quick.sport);
+    });
+  }
+
+  /* ------------------------------- 2. club ------------------------------ */
+  const clubs = e('quickClubs');
+  if (clubs) {
+    const ratings = clubRatings();
+    clubs.innerHTML = TEAMS.map((t) => {
+      const r = ratings[t.id] || {};
+      const ovr = clubOverall(t.id);
+      return `<button class="club-card" data-club="${t.id}" aria-pressed="false">
+        <span class="cc-crest">${crestSVG(t, { size: 52 })}</span>
+        <span class="cc-body">
+          <span class="cc-top">
+            <b>${t.name}</b>
+            <em class="cc-ovr">${ovr}</em>
+          </span>
+          <span class="cc-coach">${t.coach}</span>
+          <span class="cc-bars">
+            ${[['Speed', r.speed], ['Power', r.power], ['Stamina', r.stamina]]
+              .map(
+                ([label, v]) => `<span class="cc-bar"><i style="width:${v}%"></i>
+                  <small>${label}</small><u>${v}</u></span>`
+              )
+              .join('')}
+          </span>
+        </span>
+      </button>`;
+    }).join('');
+    clubs.querySelectorAll('[data-club]').forEach((b) => {
+      b.onclick = () => {
+        audio.click();
+        quick.club = b.dataset.club;
+        clubs.querySelectorAll('[data-club]').forEach((x) => {
+          const on = x.dataset.club === quick.club;
+          x.classList.toggle('on', on);
+          x.setAttribute('aria-pressed', String(on));
+        });
+      };
+    });
+  }
+
+  /* ------------------------------- 3. mode ------------------------------ */
+  const modes = e('quickModes');
+  if (modes) {
+    modes.querySelectorAll('[data-mode]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.mode === quick.mode);
+      b.onclick = () => {
+        audio.click();
+        quick.mode = b.dataset.mode;
+        renderQuick();
+      };
+    });
+  }
+
+  const preview = e('quickPreview');
+  if (preview) {
+    if (quick.step === 'mode' && quick.club) {
+      const t = teamById(quick.club);
+      const sp = SPORTS.find((x) => x.id === quick.sport) || SPORTS[0];
+      preview.innerHTML = `
+        <div class="qp-card">
+          ${crestSVG(t, { size: 56 })}
+          <div>
+            <b>${t.name}</b>
+            <span>${sp.icon} ${sp.name} · ${quick.mode === 'practice' ? 'Practice' : 'Match'} · ${t.coach}</span>
+          </div>
+        </div>`;
+    } else preview.innerHTML = '';
+  }
+
+  /* ------------------------- footer and buttons ------------------------- */
+  const recap = e('quickRecap');
+  if (recap) {
+    const parts = [];
+    if (quick.sport) parts.push(SPORTS.find((x) => x.id === quick.sport)?.name);
+    if (quick.club) parts.push(teamById(quick.club).name);
+    if (quick.step === 'mode') parts.push(quick.mode === 'practice' ? 'Practice' : 'Match');
+    recap.textContent = parts.filter(Boolean).join(' · ');
+  }
+
+  const back = e('quickBack');
+  const go = e('quickGo');
+  const atStart = quick.step === 'sport';
+  if (back) back.hidden = atStart;
+  if (go) {
+    const ready = quick.step === 'club' ? !!quick.club : true;
+    go.disabled = !ready;
+    go.textContent =
+      quick.step === 'sport' ? 'CONTINUE →' : quick.step === 'club' ? 'CONTINUE →' : 'KICK OFF ⚡';
+  }
+}
+
+function quickNext() {
+  if (quick.step === 'sport') return setQuickStep('club');
+  if (quick.step === 'club') return quick.club ? setQuickStep('mode') : null;
+  // commit the choices and go straight to the squad screen
+  app.sport = quick.sport || app.sport;
+  app.mode = quick.mode;
+  app.homeTeam = quick.club || app.homeTeam;
+  const others = TEAMS.filter((x) => x.id !== app.homeTeam);
+  app.awayTeam = others[Math.floor(Math.random() * others.length)].id;
+  app.homePlayer = null;
+  app.awayPlayer = null;
+  openPlayers(app.sport);
+}
+
+function quickBack() {
+  const i = QUICK_STEPS.indexOf(quick.step);
+  if (i > 0) setQuickStep(QUICK_STEPS[i - 1]);
 }
 
 /* ----------------------------- player picker ----------------------------- */
@@ -333,6 +514,11 @@ function finishGame(result) {
   }, 900);
 }
 
+function verdict(html) {
+  const el = document.getElementById('resultVerdict');
+  if (el) el.innerHTML = html || '';
+}
+
 function renderResult(r) {
   const sport = app.sport;
   const title = document.getElementById('resultTitle');
@@ -358,40 +544,68 @@ function renderResult(r) {
     kicker.textContent = 'FULL TIME · SEROMA LEAGUE';
     title.textContent = r.result === 'win' ? 'Victory!' : r.result === 'draw' ? 'Honours even' : 'Defeat';
     score.textContent = `${r.home} – ${r.away}`;
+    const s2 = r.stats;
     stats.innerHTML = [
-      ['Goals', r.stats.goals],
-      ['Shots', r.stats.shots],
-      ['Passes', r.stats.passes],
-      ['Tackles', r.stats.tackles],
-      ['Distance', Math.round(r.stats.distance) + ' m'],
+      ['Shots', `${s2.shots}`],
+      ['On target', `${s2.onTarget ?? 0}`],
+      ['Possession', `${s2.possession ?? 0}%`],
+      ['Top speed', `${s2.topSpeedKmh ?? 0}`],
+      ['Passes', `${s2.passes}`],
+      ['Tackles', `${s2.tackles}`],
     ]
       .map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`)
       .join('');
+    verdict(
+      r.result === 'win'
+        ? `<b>Player of the match.</b> ${s2.goals} goal${s2.goals === 1 ? '' : 's'} from ${s2.shots} shot${
+            s2.shots === 1 ? '' : 's'
+          } — ${s2.possession ?? 0}% of the ball was yours.`
+        : r.result === 'draw'
+        ? `<b>Honours even.</b> You kept ${s2.possession ?? 0}% of possession and topped out at ${s2.topSpeedKmh ?? 0} km/h.`
+        : `<b>Plenty to build on.</b> ${s2.onTarget ?? 0} of ${s2.shots} shots found the target — the crowd wants more.`
+    );
   } else if (sport === 'basketball') {
     kicker.textContent = 'FINAL BUZZER · SEROMA COURT';
     title.textContent = r.result === 'win' ? 'Bucket!' : r.result === 'draw' ? 'Tied up' : 'Rim out';
     score.textContent = `${r.score} – ${r.oppScore}`;
+    const bst = r.stats || {};
     stats.innerHTML = [
       ['Your points', r.score],
       ['Best run', r.best],
       ['Opponent', r.oppScore],
+      ['Green releases', bst.green ?? 0],
+      ['Shots taken', bst.shots ?? 0],
     ]
       .map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`)
       .join('');
+    verdict(
+      r.result === 'win'
+        ? `<b>Bucket after bucket.</b> ${bst.green ?? 0} of your releases dropped through the green.`
+        : `<b>Keep shooting.</b> Best run ${r.best} — the net will open up.`
+    );
   } else {
     kicker.textContent = 'RACE COMPLETE · SEROMA AQUATICS';
     title.textContent = r.result === 'win' ? 'Gold for you!' : r.position === 2 ? 'Silver lane' : 'Touched out';
     score.textContent = `P${r.position} · ${r.time.toFixed(2)}s`;
+    const acc = r.strokes ? Math.round((r.perfect / r.strokes) * 100) : 0;
     stats.innerHTML = [
       ['Position', 'P' + r.position],
+      ['Stroke accuracy', acc + '%'],
       ['Perfect strokes', r.perfect],
       ['Strokes', r.strokes],
       ['Time', r.time.toFixed(2) + 's'],
     ]
       .map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`)
       .join('');
+    verdict(
+      acc >= 60
+        ? `<b>Beautiful rhythm.</b> ${acc}% of your strokes hit the sweet spot.`
+        : `<b>Tidy up the timing.</b> ${r.perfect} of ${r.strokes} strokes were perfect — aim for the middle of the cycle.`
+    );
   }
   app.lastResult = r;
+  const poll = document.getElementById('resultPoll');
+  if (poll) poll.href = SCHOOL.poll;
 }
 
 /* --------------------------------- wiring -------------------------------- */
@@ -399,8 +613,39 @@ function bind() {
   document.getElementById('playNow').onclick = () => {
     audio.unlock();
     audio.click();
-    openPlayers(app.sport || 'football');
+    openQuick(null);
   };
+  document.getElementById('quickGo').onclick = () => {
+    audio.click();
+    quickNext();
+  };
+  document.getElementById('quickBack').onclick = () => {
+    audio.click();
+    quickBack();
+  };
+  document.getElementById('quickClose').onclick = () => {
+    audio.click();
+    show('screen-home');
+  };
+  document.querySelectorAll('#quickSteps li').forEach((li) => {
+    li.onclick = () => {
+      const idx = QUICK_STEPS.indexOf(li.dataset.step);
+      const cur = QUICK_STEPS.indexOf(quick.step);
+      if (idx <= cur) {
+        audio.click();
+        setQuickStep(li.dataset.step);
+      }
+    };
+  });
+
+  const rotateSkip = document.getElementById('rotateSkip');
+  if (rotateSkip) {
+    rotateSkip.onclick = () => {
+      audio.click();
+      document.body.classList.add('rotate-dismissed');
+    };
+  }
+
   document.getElementById('howBtn').onclick = () => {
     audio.click();
     show('screen-how');

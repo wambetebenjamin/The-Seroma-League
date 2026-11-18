@@ -42,12 +42,15 @@
 
         <div class="hud-center">
           <div id="banner" class="banner"></div>
+        <div id="bigBanner" class="big-banner" aria-live="assertive"></div>
+        <div id="screenFlash" class="screen-flash" aria-hidden="true"></div>
+        <div id="sparks" class="sparks" aria-hidden="true"></div>
           <div id="aimReticle" class="reticle"><span></span></div>
         </div>
 
         <div class="hud-bottom">
           <div class="hud-left">
-            <div class="meter stamina">
+            <div class="meter stamina compact" aria-hidden="true">
               <label>STAMINA</label>
               <div class="bar"><i data-stamina></i></div>
             </div>
@@ -83,7 +86,9 @@
           <button class="stroke-btn" id="strokeBtn">STROKE</button>
         </div>
 
-        <div class="control-legend" id="controlLegend">
+        <button class="help-toggle" id="helpToggle" aria-expanded="false" aria-controls="controlLegend" aria-label="Controls">?</button>
+
+        <div class="control-legend" id="controlLegend" aria-hidden="true">
           <div class="lrow"><kbd>W A S D</kbd><span>move</span></div>
           <div class="lrow"><kbd>drag / mouse</kbd><span>look around</span></div>
           <div class="lrow"><kbd>hold click / F</kbd><span>power up, release to kick where you look</span></div>
@@ -95,6 +100,16 @@
         </div>
 
         <div class="touch-stick" id="stickVisual" aria-hidden="true"><i></i></div>
+
+        <!-- portrait phones get this before the match, so controls never overlap -->
+        <div class="rotate-gate" id="rotateGate" aria-live="polite">
+          <div class="rotate-card">
+            <div class="rotate-phone"><i></i></div>
+            <h2>Rotate your phone</h2>
+            <p>Landscape gives you the whole pitch, and keeps the controls under your thumbs.</p>
+            <button class="btn ghost small" id="rotateSkip">PLAY IN PORTRAIT ANYWAY</button>
+          </div>
+        </div>
       </div>
 
       <!-- Menus -->
@@ -165,6 +180,57 @@
                 All artwork in the league is original stylized 3D illustration of Seroma Christian High
                 School, made to celebrate the school community.
               </p>
+            </footer>
+          </div>
+        </section>
+
+        <!-- Quick play: sport -> club -> mode, no lore in the way -->
+        <section class="screen" id="screen-quick">
+          <div class="quick">
+            <header class="quick-head">
+              <button class="back" data-back>←</button>
+              <ol class="quick-steps" id="quickSteps">
+                <li data-step="sport" class="on"><b>1</b><span>Sport</span></li>
+                <li data-step="club"><b>2</b><span>Club</span></li>
+                <li data-step="mode"><b>3</b><span>Mode</span></li>
+              </ol>
+              <button class="icon-btn" id="quickClose" aria-label="Close">✕</button>
+            </header>
+
+            <div class="quick-body">
+              <div class="quick-pane" data-pane="sport">
+                <h2>Pick your sport</h2>
+                <div class="quick-sports" id="quickSports"></div>
+              </div>
+
+              <div class="quick-pane" data-pane="club" hidden>
+                <h2>Pick your club</h2>
+                <p class="muted quick-sub">Ratings come from the season's award races. Tap a badge.</p>
+                <div class="club-cards" id="quickClubs"></div>
+              </div>
+
+              <div class="quick-pane" data-pane="mode" hidden>
+                <h2>Match or practice?</h2>
+                <div class="quick-modes" id="quickModes">
+                  <button class="quick-mode on" data-mode="match">
+                    <b>MATCH</b>
+                    <span>Full match. Crowd in, clock running, opponents pressing.</span>
+                  </button>
+                  <button class="quick-mode" data-mode="practice">
+                    <b>PRACTICE</b>
+                    <span>No clock, a keeper you can beat. Learn the controls.</span>
+                  </button>
+                </div>
+                <div class="quick-preview" id="quickPreview"></div>
+              </div>
+            </div>
+
+            <footer class="quick-foot">
+              <div class="quick-recap" id="quickRecap"></div>
+              <div class="quick-actions">
+                <button class="btn ghost" id="quickBack" hidden>BACK</button>
+                <button class="btn primary" id="quickGo">CONTINUE →</button>
+              </div>
             </footer>
           </div>
         </section>
@@ -260,6 +326,14 @@
               <h2 id="resultTitle">Victory</h2>
               <div class="result-score" id="resultScore"></div>
               <div class="result-stats" id="resultStats"></div>
+              <div class="result-verdict" id="resultVerdict"></div>
+              <div class="result-vote">
+                <div class="rv-copy">
+                  <b>Now have your real say.</b>
+                  <span>These votes decide the Seroma League awards. Cast yours in the official poll.</span>
+                </div>
+                <a class="btn gold small" id="resultPoll" target="_blank" rel="noopener">CAST YOUR VOTE ↗</a>
+              </div>
               <div class="result-actions">
                 <button class="btn primary" id="rematch">PLAY AGAIN</button>
                 <button class="btn ghost" id="toMenu">MAIN MENU</button>

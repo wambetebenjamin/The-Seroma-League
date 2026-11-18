@@ -258,6 +258,7 @@ export class SwimmingGame {
       quality = 1;
       this.perfect++;
       this._flash('PERFECT STROKE', 0.6);
+      this.onEvent({ type: 'perfect', big: this.perfect % 5 === 0 });
     } else if (off < 0.2) quality = 0.66;
     else if (off < 0.34) quality = 0.34;
     else quality = 0.08;

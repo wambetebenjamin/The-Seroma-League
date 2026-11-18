@@ -36,6 +36,9 @@ export class Hud {
       awayDot: $(root, '[data-away-dot]'),
       clock: $(root, '[data-clock]'),
       banner: $(root, '#banner'),
+      bigBanner: $(root, '#bigBanner'),
+      flash: $(root, '#screenFlash'),
+      sparks: $(root, '#sparks'),
       stamina: $(root, '[data-stamina]'),
       charge: $(root, '[data-charge]'),
       chargeMeter: $(root, '#chargeMeter'),
@@ -60,6 +63,10 @@ export class Hud {
     this._bindControls();
     this._configureSport();
     this.lastBanner = '';
+    // which pills are allowed to show, given the sport and possession
+    this.pillState = { attacking: true, defending: false, hasBall: false };
+    this._helpOpen = false;
+    this._hintFaded = false;
   }
 
   _configureSport() {
@@ -90,7 +97,11 @@ export class Hud {
       b.classList.toggle('hidden', this.sport !== 'football' && b.classList.contains('skill-pill'));
     });
     e.legend = $(this.root, '#controlLegend');
-    if (this.sport !== 'football' && e.legend) e.legend.classList.add('hidden');
+    if (this.sport !== 'football') {
+      if (e.legend) e.legend.classList.add('hidden');
+      const help = $(this.root, '#helpToggle');
+      if (help) help.classList.add('hidden');
+    }
     const kick = e.kick;
     const down = (ev) => {
       ev.preventDefault();
@@ -136,7 +147,65 @@ export class Hud {
       this.opts.onStroke?.();
     };
 
+    // collapsible control legend: starts open, then fades out of the way
+    e.helpToggle = $(this.root, '#helpToggle');
+    if (e.helpToggle) {
+      e.helpToggle.onclick = () => {
+        this._helpOpen = !this._helpOpen;
+        this._applyHelp();
+      };
+    }
+    this._helpTimer = setTimeout(() => {
+      if (!this._helpOpen) this._applyHelp(true);
+    }, 10000);
+
     this._stickLoop();
+  }
+
+  /** Show/hide the keyboard legend, and fade it after the opening seconds. */
+  _applyHelp(forceFade = false) {
+    const e = this.els;
+    if (!e.legend) return;
+    const show = this._helpOpen;
+    e.legend.classList.toggle('open', show);
+    e.legend.classList.toggle('faded', !show && (forceFade || this._hintFaded));
+    e.legend.setAttribute('aria-hidden', String(!show));
+    if (e.helpToggle) {
+      e.helpToggle.setAttribute('aria-expanded', String(show));
+      e.helpToggle.classList.toggle('on', show);
+    }
+    if (forceFade) this._hintFaded = true;
+  }
+
+  /**
+   * Show only the pills that matter right now: while defending you get the
+   * tackle, while attacking you get the skills. Everything else is hidden so
+   * the pitch stays clear.
+   */
+  _applyPills(h) {
+    const e = this.els;
+    if (!e.skillRow) return;
+    const attacking = h.hasBall !== false;
+    const defending = !attacking;
+    const buttons = e.skillRow.querySelectorAll('[data-action]');
+    buttons.forEach((b) => {
+      const a = b.dataset.action;
+      let show = true;
+      if (this.sport === 'football') {
+        if (a === 'tackle') show = defending;
+        else if (a === 'call') show = defending;
+        else if (a.startsWith('skill')) show = attacking;
+        else if (a === 'lookBack') show = defending;
+      } else if (this.sport === 'basketball') {
+        if (a === 'tackle') show = defending;
+        else if (a === 'call') show = attacking;
+        else show = false;
+      } else {
+        // swimming hides the whole row
+        show = false;
+      }
+      b.classList.toggle('hidden', !show);
+    });
   }
 
   _stickLoop() {
@@ -170,8 +239,67 @@ export class Hud {
   }
 
   onEvent(e) {
+    if (!e) return;
     if (e.type === 'banner') {
       this._flashBanner(e.text);
+    } else if (e.type === 'goal') {
+      // the celebration: a huge animated banner plus a colour wash
+      const good = e.homeScored !== false;
+      this.bigBanner(good ? 'GOAL!' : 'CONCEDED', good ? 'good' : 'bad', 2.2);
+      this.flash(good ? 'good' : 'bad');
+      if (good) this.spark(18);
+    } else if (e.type === 'basket') {
+      const two = e.pts >= 3 ? '3-POINTER!' : e.pts >= 1 ? 'SHOT!' : 'BUCKET!';
+      this.bigBanner(two, 'good', 1.8);
+      this.flash('good');
+      this.spark(12);
+    } else if (e.type === 'perfect') {
+      this.flash('perfect');
+      this.spark(e.big ? 16 : 9);
+    } else if (e.type === 'shot') {
+      // full-power strikes hit harder: a jolt on the camera and a hot flash
+      if ((e.power || 0) > 0.82) this.flash('power');
+    }
+  }
+
+  /** Bold, animated centre-screen word: GOAL!, 3-POINTER!, etc. */
+  bigBanner(text, tone = 'good', secs = 2) {
+    const el = this.els.bigBanner;
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'big-banner on ' + tone;
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+    clearTimeout(this._bigTimer);
+    this._bigTimer = setTimeout(() => {
+      el.className = 'big-banner';
+    }, secs * 1000);
+  }
+
+  /** Full-screen colour wash: good (green), perfect (gold-green), power (hot). */
+  flash(tone = 'good') {
+    const el = this.els.flash;
+    if (!el) return;
+    el.className = 'screen-flash';
+    void el.offsetWidth;
+    el.className = 'screen-flash ' + tone;
+  }
+
+  /** A burst of little sparks from the centre of the screen. */
+  spark(n = 10) {
+    const host = this.els.sparks;
+    if (!host) return;
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement('i');
+      const ang = (Math.PI * 2 * i) / n + Math.random() * 0.5;
+      const dist = 70 + Math.random() * 130;
+      s.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
+      s.style.setProperty('--dy', Math.sin(ang) * dist * 0.72 + 'px');
+      s.style.setProperty('--rot', Math.random() * 360 + 'deg');
+      s.style.animationDelay = Math.random() * 0.09 + 's';
+      host.appendChild(s);
+      setTimeout(() => s.remove(), 900);
     }
   }
 
@@ -232,6 +360,9 @@ export class Hud {
 
     if (h.hint) e.hint.textContent = h.hint;
 
+    // contextual action pills: only what is useful right now
+    if (h.hasBall !== undefined || this.sport !== 'football') this._applyPills(h);
+
     // football: dim the skill pills while on cooldown, light the kick button
     // when you are looking up at the top corner, and flag look-back
     if (typeof h.skillReady === 'boolean' && this.skillPills.length) {
@@ -270,5 +401,7 @@ export class Hud {
 
   destroy() {
     cancelAnimationFrame(this._stickRaf);
+    clearTimeout(this._helpTimer);
+    clearTimeout(this._bigTimer);
   }
 }

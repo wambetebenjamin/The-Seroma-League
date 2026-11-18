@@ -47,6 +47,7 @@ export class BasketballGame {
     this.score = 0;
     this.oppScore = 0;
     this.streak = 0;
+    this.shotStats = { shots: 0, green: 0 };
     this.best = Number(localStorage.getItem('seroma.bball.best') || 0);
     this.practice = !!opts.practice;
     this.timeLeft = opts.duration ?? (this.practice ? 3599 : 90);
@@ -333,6 +334,11 @@ export class BasketballGame {
     // the rim sits above the release, so the arc has to clear it
     this.ballVel.y = (target.y - start.y) / airtime + 0.5 * 12.5 * airtime;
 
+    this.shotStats.shots++;
+    if (inGreen) {
+      this.shotStats.green++;
+      this.onEvent({ type: 'perfect', big: accuracy > 0.9 });
+    }
     this.ballState = 'flying';
     this.shotClock = 0;
     this.shotResolved = false;
@@ -584,6 +590,7 @@ export class BasketballGame {
       result: this.score > this.oppScore ? 'win' : this.score === this.oppScore ? 'draw' : 'loss',
       homeName: this.homeName,
       awayName: this.awayName,
+      stats: this.shotStats,
     });
   }
 
