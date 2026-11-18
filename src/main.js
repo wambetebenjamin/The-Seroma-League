@@ -170,6 +170,10 @@ function buildHome() {
           <span aria-hidden="true">${v.icon}</span>${v.name}
         </button>`
     ).join('');
+    // keep the highlight in sync whenever the bar is rebuilt
+    tabs.querySelectorAll('[data-venue]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.venue === activeVenue);
+    });
     tabs.querySelectorAll('[data-venue]').forEach((b) => {
       b.onclick = () => {
         audio.click();
