@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { initials } from '../data/seroma.js';
 import { addContactShadow } from '../core/style.js';
+import { jerseyTexture } from '../core/textures.js';
 
 const SKIN = [0x8a5a34, 0x6f4426, 0x9c6a3f, 0x5c3720, 0x7d5030, 0xa8734a];
 const HAIR = [0x171210, 0x1f1712, 0x2a1d15, 0x120e0c];
@@ -105,8 +106,12 @@ export class Avatar {
     L.add(collar);
 
     if (!S) {
-      // number on the back
-      const num = new THREE.Mesh(g('num', () => new THREE.PlaneGeometry(0.3, 0.26)), trim);
+      // the player's shirt number, on the back of the kit
+      const numTex = jerseyTexture(kit.primary, kit.secondary, this.number || 7);
+      const num = new THREE.Mesh(
+        g('num', () => new THREE.PlaneGeometry(0.3, 0.26)),
+        new THREE.MeshStandardMaterial({ map: numTex, roughness: 0.86 })
+      );
       num.position.set(0, 1.3, 0.235);
       L.add(num);
       // side stripe on the shorts
@@ -378,36 +383,62 @@ export class Avatar {
     this.group.rotation.y = h;
   }
 
-  animate(t, speed = 0) {
+  /**
+   * Walk/run cycle.
+   *
+   * The stride phase is *accumulated* from the actual speed instead of being
+   * derived from `sin(t * cadence)`: when cadence changes with speed, that
+   * form teleports the limbs every frame, which is what made the far players
+   * look like they were vibrating. Integrating phase means the legs always
+   * advance continuously, so the motion is smooth at any speed.
+   */
+  animate(t, speed = 0, dt = 1 / 60) {
     this.speed = speed;
-    const run = Math.min(1, speed / 6);
-    const cadence = 6 + run * 8;
-    const swing = Math.sin(t * cadence) * (0.28 + run * 0.72);
+    const run = Math.min(1, Math.max(0, speed) / 6);
+    const cadence = 4.2 + run * 9; // steps per second of the stride cycle
+
+    // advance the cycle only as fast as we are actually moving
+    const step = dt * cadence * (0.24 + run * 0.76);
+    this.phase = (this.phase || 0) + step;
+    if (this.phase > Math.PI * 4000) this.phase -= Math.PI * 4000; // keep float precision
+
+    // ease the stride amplitude so stopping does not snap the limbs straight
+    const targetAmp = 0.16 + run * 0.74;
+    this.amp = this.amp === undefined ? targetAmp : this.amp + (targetAmp - this.amp) * Math.min(1, dt * 10);
+    const swing = Math.sin(this.phase) * this.amp;
+    const lift = Math.cos(this.phase);
 
     if (this.legs?.[0]) {
       this.legs[0].rotation.x = swing;
       this.legs[1].rotation.x = -swing;
-      // bend the trailing knee for a natural stride
       if (this.knees) {
-        this.knees[0].rotation.x = Math.max(0, -swing) * 1.1;
-        this.knees[1].rotation.x = Math.max(0, swing) * 1.1;
-      }
-    }
-    if (this.arms?.[0]) {
-      this.arms[0].rotation.x = -swing * 0.85;
-      this.arms[1].rotation.x = swing * 0.85;
-      this.arms[0].rotation.z = 0.06;
-      this.arms[1].rotation.z = -0.06;
-      if (this.elbows) {
-        this.elbows[0].rotation.x = -0.35 - Math.max(0, swing) * 0.5;
-        this.elbows[1].rotation.x = -0.35 - Math.max(0, -swing) * 0.5;
+        // the knee only bends as the leg travels backwards
+        this.knees[0].rotation.x = Math.max(0, -swing) * 1.15;
+        this.knees[1].rotation.x = Math.max(0, swing) * 1.15;
       }
     }
 
-    // small vertical bob on the body only (never on the root, or it would drift)
+    if (this.arms?.[0]) {
+      // arms counter-swing, and settle to a relaxed hang when idle
+      this.arms[0].rotation.x = -swing * 0.9 - (1 - run) * 0.06;
+      this.arms[1].rotation.x = swing * 0.9 - (1 - run) * 0.06;
+      this.arms[0].rotation.z = 0.07 + (1 - run) * 0.05;
+      this.arms[1].rotation.z = -0.07 - (1 - run) * 0.05;
+      if (this.elbows) {
+        this.elbows[0].rotation.x = -0.3 - Math.max(0, swing) * 0.6;
+        this.elbows[1].rotation.x = -0.3 - Math.max(0, -swing) * 0.6;
+      }
+    }
+
+    // torso: a gentle bob and lean, driven by the same phase so it never jitters
     if (this.body) {
-      this.body.position.y = Math.abs(Math.sin(t * cadence)) * 0.026 * run;
-      this.body.rotation.z = Math.sin(t * cadence * 0.5) * 0.012 * run;
+      this.body.position.y = Math.abs(lift) * 0.034 * run;
+      this.body.rotation.z = swing * 0.05;
+      this.body.rotation.x = run * 0.08; // lean into the run
+    }
+    // idle breathing when standing still, so nobody looks frozen
+    if (this.head && run < 0.08) {
+      this.head.position.y = 1.76 + Math.sin(t * 1.6 + (this.breathPhase || 0)) * 0.006;
     }
   }
 

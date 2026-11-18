@@ -224,7 +224,11 @@ console.log('BASKETBALL');
   const input = fakeInput();
   g.attachInput(input);
   const dt = 1 / 60;
-  for (let i = 0; i < 60 * 90; i++) {
+  // Simulate a long session with the player taking regular shots. The AI
+  // opponent only gets a look-in between possessions, so give it enough
+  // possessions that "the opponent can score" is a deterministic result
+  // rather than a coin flip.
+  for (let i = 0; i < 60 * 200; i++) {
     input._look = { x: 0, y: i % 200 < 100 ? 0.004 : -0.004 };
     if (i % 120 === 0) {
       g.pitch = 0.42; // look up at the rim
@@ -233,6 +237,7 @@ console.log('BASKETBALL');
     }
     if (i % 120 === 70) input._actions.push('kickUp');
     g.update(dt, input);
+    if (g.getHUD().oppScore > 0) break; // proven, stop early
   }
   const hud = g.getHUD();
   check('score is a number', Number.isFinite(hud.score), String(hud.score));

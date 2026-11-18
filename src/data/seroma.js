@@ -305,3 +305,73 @@ export function initials(name) {
     .map((w) => w[0])
     .join('');
 }
+
+/**
+ * Club ratings, derived from the real award-poll votes rather than invented:
+ * every nominee's fan share feeds the attribute for their position. A club with
+ * strong keeper and defender nominees defends better; strong forwards and
+ * midfielders attack better; a well-voted coach lifts squad stamina.
+ *
+ * Exposed so the club picker can show Speed / Shot Power / Stamina honestly.
+ */
+const RATING_MAP = {
+  gk: 'defence',
+  defender: 'defence',
+  midfielder: 'speed',
+  forward: 'power',
+  coach: 'stamina',
+};
+
+function teamNameToId(name) {
+  const t = TEAMS.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
+  return t ? t.id : null;
+}
+
+let ratingsCache = null;
+
+export function clubRatings() {
+  if (ratingsCache) return ratingsCache;
+
+  const totals = {};
+  TEAMS.forEach((t) => {
+    totals[t.id] = { defence: 0, speed: 0, power: 0, stamina: 0, _n: {} };
+  });
+
+  // each category's shares are normalised inside that category, so a category
+  // with more voters does not dominate the rating
+  for (const cat of POLL_CATEGORIES) {
+    const attr = RATING_MAP[cat.id];
+    if (!attr) continue;
+    const max = Math.max(...cat.nominees.map((n) => n.votes), 1);
+    for (const n of cat.nominees) {
+      const id = teamNameToId(n.team);
+      if (!id) continue;
+      const share = n.votes / max; // 0..1 within the category
+      const count = totals[id]._n[attr] || 0;
+      totals[id][attr] = (totals[id][attr] * count + share) / (count + 1);
+      totals[id]._n[attr] = count + 1;
+    }
+  }
+
+  const out = {};
+  for (const t of TEAMS) {
+    const r = totals[t.id];
+    // map the 0..1 shares onto a readable 55..95 rating scale
+    const scale = (v) => Math.round(55 + Math.min(1, Math.max(0, v)) * 40);
+    out[t.id] = {
+      speed: scale(r.speed || 0.5),
+      power: scale(r.power || 0.5),
+      stamina: scale(r.stamina || 0.5),
+      defence: scale(r.defence || 0.5),
+    };
+  }
+  ratingsCache = out;
+  return out;
+}
+
+/** Overall = mean of the four ratings, for sorting and badge display. */
+export function clubOverall(id) {
+  const r = clubRatings()[id];
+  if (!r) return 70;
+  return Math.round((r.speed + r.power + r.stamina + r.defence) / 4);
+}

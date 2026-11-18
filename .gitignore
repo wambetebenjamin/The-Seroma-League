@@ -4,3 +4,8 @@ dist
 *.local
 .vercel
 image-search/
+
+# generated illustration previews
+tools/portraits.png
+tools/crowd.png
+tools/crowd-calm.png

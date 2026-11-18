@@ -16,6 +16,7 @@ import {
   IS_TOUCH,
 } from '../core/engine.js';
 import { makeCloudSky, makeRenderLights, applyRenderLook, addHills, addHedge } from '../core/style.js';
+import { GroundMeter } from '../world/groundMeter.js';
 import {
   grassTexture,
   dirtTexture,
@@ -180,7 +181,23 @@ export class FootballGame {
     this.kickCharge = 0;
     this.banner = '';
     this.bannerTimer = 0;
-    this.stats = { shots: 0, passes: 0, tackles: 0, saves: 0, goals: 0, distance: 0 };
+    this.stats = {
+      shots: 0,
+      onTarget: 0,
+      passes: 0,
+      passesTried: 0,
+      tackles: 0,
+      saves: 0,
+      goals: 0,
+      distance: 0,
+      topSpeed: 0,
+      possession: 0,
+      possessionTime: 0,
+      elapsed: 0,
+    };
+    // camera juice: a punchy zoom + jolt when you really lash one
+    this.shotKick = 0;
+    this.shakeAmp = 0;
     this.onEvent = opts.onEvent || (() => {});
     this.onScore = opts.onScore || (() => {});
     this.onEnd = opts.onEnd || (() => {});
@@ -194,6 +211,7 @@ export class FootballGame {
     this.lights = makeRenderLights(scene);
     this._buildStadium();
     this.ball = new Ball(scene);
+    this.groundMeter = new GroundMeter(scene, { radius: 0.9 });
     this.ball.getOwnerState = (o) => this._ownerState(o);
     this._spawnPlayers();
     this._resize();
@@ -276,9 +294,21 @@ export class FootballGame {
       this.goals.push({ side: s, group: grp });
     });
 
-    // grandstands on both touchlines
-    addGrandstand(scene, 0, -halfL - 12, 0, 52, [this.homeTeam.colors.primary, '#f2f2f2']);
-    addGrandstand(scene, 0, halfL + 12, Math.PI, 52, [this.awayTeam.colors.primary, '#f2f2f2']);
+    // grandstands on both touchlines, each with a real 3D crowd
+    this.crowds = [];
+    const homeStand = addGrandstand(scene, 0, -halfL - 12, 0, 52, [
+      this.homeTeam.colors.primary,
+      this.homeTeam.colors.secondary || '#f2f2f2',
+    ], { rows: 5 });
+    const awayStand = addGrandstand(scene, 0, halfL + 12, Math.PI, 52, [
+      this.awayTeam.colors.primary,
+      this.awayTeam.colors.secondary || '#f2f2f2',
+    ], { rows: 5 });
+    this.crowds.push({ stand: homeStand, crowd: homeStand.userData.crowd, home: true });
+    this.crowds.push({ stand: awayStand, crowd: awayStand.userData.crowd, home: false });
+    // the touchline terraces get smaller crowds too
+    addGrandstand(scene, -halfW - 20, 0, Math.PI / 2, 26, [this.homeTeam.colors.primary, '#f2f2f2'], { rows: 4, density: 0.7 });
+    addGrandstand(scene, halfW + 20, 0, -Math.PI / 2, 26, [this.awayTeam.colors.primary, '#f2f2f2'], { rows: 4, density: 0.7 });
     // second tiers behind the goals
     addTerraces(scene, -halfW - 14, 0, { steps: 5, width: 26, rise: 0.8, run: 1.6 });
     addTerraces(scene, halfW + 14, 0, { steps: 5, width: 26, rise: 0.8, run: -1.6 });
@@ -384,8 +414,14 @@ export class FootballGame {
       });
       a.setPosition(p[0], 0, p[1]);
       scene.add(a.group);
-      const tag = makeNameTag(shortName(name), '#ffe8e8', 'rgba(60,10,15,.72)');
+      const captain = name === this.awayName;
+      const tag = makeNameTag(
+        shortName(name) + (captain ? ' ★' : ''),
+        captain ? '#141014' : '#ffe8e8',
+        captain ? 'rgba(242,193,78,.95)' : 'rgba(60,10,15,.72)'
+      );
       tag.position.y = 2.15;
+      tag.scale.set(captain ? 1.75 : 1.5, captain ? 0.44 : 0.38, 1);
       a.group.add(tag);
       const rec = {
         avatar: a,
@@ -667,6 +703,7 @@ export class FootballGame {
       const lift = clamp(0.7 + lookLift * 9 + power * 2.2, 0.4, 11);
       b.vel.set(dir.x * speed, lift, dir.z * speed);
       this.stats.shots++;
+      this.countedOnTarget = false;
       const aimHigh = lookLift > 0.32;
       this._flash(aimHigh ? 'TOP CORNER!' : 'SHOT!', 1.15);
       this.onEvent({ type: 'shot', high: aimHigh, power });
@@ -686,16 +723,24 @@ export class FootballGame {
       b.vel.set(dir.x * speed, lift, dir.z * speed);
       if (bestMate) {
         this.stats.passes++;
+        this.stats.passesTried++;
         this._flash('PASS → ' + shortName(bestMate.name), 1.1);
         bestMate.receive = 0.95;
         this.onEvent({ type: 'pass' });
       } else {
         this.stats.shots++;
+        this.countedOnTarget = false;
         this._flash('SHOT!', 1.1);
         this.onEvent({ type: 'shot', high: false, power });
       }
     }
     audio.kick(clamp(power / 1.6, 0.2, 1));
+    // full-power strikes punch the camera in and kick it sideways
+    const hit = clamp((power - 0.55) / 0.45, 0, 1);
+    if (hit > 0) {
+      this.shotKick = Math.max(this.shotKick, hit);
+      this.shakeAmp = Math.max(this.shakeAmp, hit * 0.055);
+    }
     this.shotFrom = this.me.pos.clone();
   }
 
@@ -713,6 +758,11 @@ export class FootballGame {
   update(dt, input) {
     if (this.paused || this.finished) return;
     this.time += dt;
+    if (this.crowds) {
+      for (const c of this.crowds) {
+        if (c.crowd) c.crowd.update(dt, this.time);
+      }
+    }
     if (!this.practice) this.timeLeft = Math.max(0, this.timeLeft - dt);
     this.tackleCooldown = Math.max(0, (this.tackleCooldown || 0) - dt);
     this.skillCooldown = Math.max(0, (this.skillCooldown || 0) - dt);
@@ -781,6 +831,9 @@ export class FootballGame {
     me.pos.z = clamp(me.pos.z, -PITCH.halfL - 2, PITCH.halfL + 2);
     me.speed = move.length() * speed;
     this.stats.distance += dist2(me.pos.x, me.pos.z, me.lastPos.x, me.lastPos.z);
+    this.stats.elapsed += dt;
+    if (me.speed > this.stats.topSpeed) this.stats.topSpeed = me.speed;
+    if (this.ball.owner && this.ball.owner.home) this.stats.possessionTime += dt;
 
     // body follows movement but the head follows the look direction
     if (move.lengthSq() > 0.02) me.heading = Math.atan2(-move.x, -move.z);
@@ -824,7 +877,7 @@ export class FootballGame {
       if (p.stunned > 0) {
         // beaten by a skill move: stand still, do not press
         p.speed = damp(p.speed, 0, 6, dt);
-        p.avatar.animate(this.time + p.base.x, 0);
+        p.avatar.animate(this.time + p.base.x, 0, dt);
         g.rotation.z = Math.sin(this.time * 9) * 0.06 * p.stunned;
         return;
       }
@@ -953,7 +1006,7 @@ export class FootballGame {
       } else {
         p.speed = damp(p.speed, 0, 8, dt);
       }
-      p.avatar.animate(this.time + p.base.x, p.speed);
+      p.avatar.animate(this.time + p.base.x, p.speed, dt);
     });
 
     // AI defenders press the carrier and can win it back
@@ -1122,6 +1175,10 @@ export class FootballGame {
           this._flash('SAVED BY ' + shortName(p.name) + '!', 1.6);
         } else {
           this._flash('KEEPER DENIES YOU', 1.5);
+          if (b.lastTouch === this.me && !this.countedOnTarget) {
+            this.stats.onTarget++;
+            this.countedOnTarget = true;
+          }
         }
         this.onEvent({ type: 'save' });
         return;
@@ -1162,10 +1219,21 @@ export class FootballGame {
     if (homeScored) {
       this.score.home++;
       this.stats.goals++;
+      // struck by us and it went in: credit the shot as on target
+      if (this.ball.lastTouch === this.me) this.stats.onTarget++;
+      this.shakeAmp = Math.max(this.shakeAmp, 0.03);
     } else {
       this.score.away++;
     }
     audio.goal();
+    // the crowd reacts: their end erupts, the other end groans and sits down
+    if (this.crowds) {
+      for (const c of this.crowds) {
+        if (!c.crowd) continue;
+        if (c.home === homeScored) c.crowd.celebrate(4.5);
+        else c.crowd.setExcitement(0.12);
+      }
+    }
     this.bannerTimer = 3;
     this.banner = homeScored ? 'G O A L !  ' + this.homeTeam.name.toUpperCase() : 'CONCEDED';
     this.onScore({ ...this.score, homeScored });
@@ -1190,6 +1258,25 @@ export class FootballGame {
     });
   }
 
+  /**
+   * The power/stamina ring lives on the grass around your feet, so you never
+   * have to look away from the ball to time a shot.
+   */
+  _updateGroundMeter() {
+    const m = this.groundMeter;
+    if (!m) return;
+    const me = this.me;
+    m.setPosition(me.pos.x, me.pos.z, this.yaw);
+    m.update({
+      visible: !this.paused && !this.finished,
+      charge: this.kickCharge || 0,
+      charging: (this.kickCharge || 0) > 0.02,
+      // the sweet spot: enough power to reach the top corner
+      perfect: (this.kickCharge || 0) > 0.85,
+      stamina: me.stamina,
+    });
+  }
+
   _easeInOut(t) {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
@@ -1203,6 +1290,7 @@ export class FootballGame {
     const fwd = this._forwardVector();
     this.camera.position.set(me.pos.x - fwd.x * 0.12, eyeY, me.pos.z - fwd.z * 0.12);
     this.camera.rotation.set(0, 0, 0);
+    this._updateGroundMeter();
     this.camera.rotation.order = 'YXZ';
     // look over your shoulder: swing the head round to check the press
     if (this.lookBack) this.lookBackAt = Math.min(1, (this.lookBackAt || 0) + dt * 6);
@@ -1223,7 +1311,22 @@ export class FootballGame {
     if (this.skillAnim && this.skillAnim.kind === 'roulette') {
       this.camera.rotation.y += (0.6 - this.skillAnim.t) * Math.PI * 1.5;
     }
-    this.camera.fov = lerp(this.camera.fov, 72 + (this.skillBoost > 0 ? 10 : 0), 0.1);
+    // --- shot juice: camera punch-in plus a decaying jolt -------------------
+    this.shotKick = Math.max(0, (this.shotKick || 0) - dt * 1.9);
+    this.shakeAmp = Math.max(0, (this.shakeAmp || 0) - dt * 0.16);
+    const punch = this.shotKick * this.shotKick; // fast falloff, stays felt
+    if (this.shakeAmp > 0.0005) {
+      const t = this.time;
+      this.camera.position.x += Math.sin(t * 41) * this.shakeAmp;
+      this.camera.position.y += Math.sin(t * 57 + 1.7) * this.shakeAmp * 0.8;
+      this.camera.position.z += Math.sin(t * 33 + 0.4) * this.shakeAmp * 0.6;
+      this.camera.rotation.z += Math.sin(t * 47) * this.shakeAmp * 0.5;
+    }
+    this.camera.fov = lerp(
+      this.camera.fov,
+      72 + (this.skillBoost > 0 ? 10 : 0) - punch * 9,
+      0.22
+    );
     this.camera.updateProjectionMatrix();
   }
 
@@ -1257,7 +1360,12 @@ export class FootballGame {
     audio.whistle();
     const result =
       this.score.home > this.score.away ? 'win' : this.score.home < this.score.away ? 'loss' : 'draw';
-    this.onEnd({ ...this.score, result, stats: this.stats, homeName: this.homeName, awayName: this.awayName });
+    const st = this.stats;
+    const elapsed = Math.max(st.elapsed, 0.001);
+    st.possession = Math.round((st.possessionTime / elapsed) * 100);
+    st.topSpeedKmh = Math.round(st.topSpeed * 3.6);
+    st.passRate = st.passesTried ? Math.round((st.passes / st.passesTried) * 100) : 0;
+    this.onEnd({ ...this.score, result, stats: st, homeName: this.homeName, awayName: this.awayName });
   }
 
   start() {
@@ -1294,6 +1402,7 @@ export class FootballGame {
     cancelAnimationFrame(this.raf);
     this.ro?.disconnect();
     audio.stopCrowd();
+    this.groundMeter?.dispose();
     disposeScene(this.scene);
     this.renderer?.dispose();
     this.canvas.remove();
