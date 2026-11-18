@@ -414,6 +414,12 @@ export class FootballGame {
     this.pitch = clamp(this.pitch - dy, -1.1, 1.1);
   }
 
+  /** Reference-style "look over your shoulder" (right click / hold LOOK). */
+  setLookBack(on) {
+    this.lookBack = !!on;
+    if (on) this.lookBackAt = 0;
+  }
+
   onAction(name) {
     if (this.paused && name !== 'pause') return;
     if (name === 'call') {
@@ -427,6 +433,12 @@ export class FootballGame {
     } else if (name === 'kickUp') {
       this._kick(this.kickCharge);
       this.kickCharge = 0;
+    } else if (name === 'lookBack') {
+      this.setLookBack(true);
+    } else if (name === 'lookBackEnd') {
+      this.setLookBack(false);
+    } else if (name === 'sprintToggle') {
+      this.sprintLock = !this.sprintLock;
     }
   }
 
@@ -505,31 +517,88 @@ export class FootballGame {
     }
   }
 
+  /**
+   * The three reference skill moves. Each commits your body for a moment, so
+   * mistiming one lets the defender in — that is what makes them feel earned.
+   */
   _skill(name) {
     if (!this.ball.owner || this.ball.owner !== this.me) {
       this._flash('NEED THE BALL FOR THAT');
       return;
     }
     if (this.skillCooldown > 0) return;
-    this.skillCooldown = 1.6;
-    const labels = { skill1: 'STEP-OVER', skill2: 'RAINBOW FLICK', skill3: 'ROULETTE' };
-    this._flash(labels[name] || 'SKILL');
-    if (name === 'skill2') {
+    this.skillCooldown = name === 'skill2' ? 2.4 : 1.5;
+    const labels = { skill1: 'STEP-OVERS', skill2: 'RAINBOW FLICK', skill3: 'ROULETTE' };
+    this._flash(labels[name] || 'SKILL', 1.0);
+    this.onEvent({ type: 'skill', skill: name });
+    audio.tone({ freq: 520, dur: 0.09, type: 'triangle', gain: 0.07, slide: 180 });
+
+    if (name === 'skill1') {
+      // step-overs: quick feet that beat the nearest man sideways
+      this.skillAnim = { kind: 'stepover', t: 0.5 };
+      const p = this._nearestOpponent();
+      if (p) {
+        const g = p.avatar.group.position;
+        const side = Math.sign(this.me.pos.x - g.x) || 1;
+        const right = new THREE.Vector3(-Math.cos(this.yaw), 0, Math.sin(this.yaw)).multiplyScalar(side);
+        this.me.pos.addScaledVector(right, 1.5);
+        this.me.pos.z -= 1.0;
+        p.stunned = 0.75;
+      }
+      this.skillBoost = 0.8;
+      audio.kick(0.3);
+    } else if (name === 'skill2') {
+      // rainbow flick: lift it over your marker, then run onto it
       this.ball.owner = null;
       const f = this._forwardVector();
-      this.ball.vel.set(f.x * 5, 7.5, f.z * 5);
+      this.ball.vel.set(f.x * 4.2, 8.4, f.z * 4.2);
+      this.ball.lofted = true;
+      this.skillAnim = { kind: 'rainbow', t: 0.7 };
+      const p = this._nearestOpponent();
+      if (p) p.stunned = 1.0;
+      this.skillBoost = 1.3;
+      if (this.onEvent) this.onEvent({ type: 'rainbow' });
       audio.kick(0.6);
     } else {
-      // sidestep burst
+      // roulette: spin past the defender and keep the ball
+      this.skillAnim = { kind: 'roulette', t: 0.6 };
+      const p = this._nearestOpponent();
+      if (p) {
+        const g = p.avatar.group.position;
+        const side = Math.sign(this.me.pos.x - g.x) || 1;
+        this.me.pos.x += side * 1.7;
+        this.me.pos.z -= 1.2;
+        p.stunned = 0.9;
+      }
       this.skillBoost = 1.0;
+      audio.tone({ freq: 660, dur: 0.16, type: 'sine', gain: 0.06, slide: -240 });
     }
+  }
+
+  _nearestOpponent() {
+    let best = null;
+    let bd = 4.2;
+    this.opponents.forEach((o) => {
+      if (o.role === 'gk') return;
+      const g = o.avatar.group.position;
+      const d = dist2(g.x, g.z, this.me.pos.x, this.me.pos.z);
+      if (d < bd) {
+        bd = d;
+        best = o;
+      }
+    });
+    return best;
   }
 
   _forwardVector() {
     return new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
   }
 
-  /** Raycast from the camera along the view; decides pass vs shot. */
+  /**
+   * Reference-style kicking: hold to power up, release where you are looking.
+   * Look at the top corner of the goal and hold long enough and you get a
+   * rising shot into that corner; release at a team-mate and it is a pass.
+   */
   _kick(charge) {
     const b = this.ball;
     const holder = b.owner;
@@ -538,12 +607,15 @@ export class FootballGame {
       this._flash('TOO FAR FROM THE BALL');
       return;
     }
-    const power = clamp(0.3 + charge * 1.5, 0.3, 1.8);
-    const dir = this._aimDirection();
+    const power = clamp(0.25 + charge * 1.45, 0.25, 1.75);
+    const view = this._aimDirection(); // includes the up/down of your look
+    const flat = view.clone().setY(0);
+    if (flat.lengthSq() < 1e-4) flat.set(0, 0, -1);
+    flat.normalize();
 
-    // is a teammate in the aim cone? then it is a pass — unless you wound up a shot.
+    // the reference logic: look at a team-mate → pass, look at the goal → shot
     let bestMate = null;
-    let bestDot = 0.965;
+    let bestDot = 0.972;
     this.teammates.forEach((t) => {
       const to = new THREE.Vector3(
         t.avatar.group.position.x - this.me.pos.x,
@@ -551,9 +623,9 @@ export class FootballGame {
         t.avatar.group.position.z - this.me.pos.z
       );
       const d = to.length();
-      if (d < 1.2 || d > 32) return;
+      if (d < 1.4 || d > 34) return;
       to.normalize();
-      const dot = to.dot(dir);
+      const dot = to.dot(flat);
       if (dot > bestDot) {
         bestDot = dot;
         bestMate = t;
@@ -561,39 +633,75 @@ export class FootballGame {
     });
 
     const goalZ = -PITCH.halfL;
-    const toGoal = new THREE.Vector3(-this.me.pos.x, 0, goalZ - this.me.pos.z).normalize();
-    const facingGoal = toGoal.dot(dir) > 0.72;
-    const willShoot = facingGoal || !bestMate;
+    const goalMouth = new THREE.Vector3(0, PITCH.goalH * 0.7, goalZ);
+    const toGoal = goalMouth.clone().sub(this.me.pos);
+    const goalDist = Math.hypot(toGoal.x, toGoal.z);
+    const goalAzimuth = Math.atan2(toGoal.x, toGoal.z);
+    const viewAzimuth = Math.atan2(flat.x, flat.z);
+    let aDiff = goalAzimuth - viewAzimuth;
+    while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+    while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+    const facingGoal = Math.abs(aDiff) < 0.6;
+    // looking up raises the shot: aim at the top corner, not the grass
+    const lookLift = clamp(this.pitch, -0.4, 0.9);
+    const willShoot = (facingGoal && goalDist < 34) || (!bestMate && facingGoal);
 
     b.owner = null;
     b.lastTouch = this.me;
-    const speed = willShoot ? 14 + power * 17 : clamp(9 + power * 7, 9, 24);
-    b.vel.set(dir.x * speed, willShoot ? 1.6 + power * 3.4 : 1.2 + power * 1.2, dir.z * speed);
-    bestMate = willShoot ? null : bestMate;
-    audio.kick(clamp(power / 1.6, 0.2, 1));
+    b.lofted = false;
 
-    if (bestMate) {
-      this.stats.passes++;
-      this._flash('PASS → ' + shortName(bestMate.name), 1.2);
-      bestMate.receive = 0.9;
-    } else {
+    if (willShoot) {
+      // side-spin carries the ball toward the corner you are looking at
+      const sideAim = clamp(aDiff * 1.35, -1, 1);
+      const dir = flat.clone();
+      dir.x += -Math.cos(this.yaw) * sideAim * 0.16;
+      dir.normalize();
+      const speed = (14 + power * 20) * (1 - Math.min(goalDist, 30) * 0.008);
+      // vertical: look up for the top corner, keep it down when you look at your laces
+      const lift = clamp(0.7 + lookLift * 9 + power * 2.2, 0.4, 11);
+      b.vel.set(dir.x * speed, lift, dir.z * speed);
       this.stats.shots++;
-      this._flash('SHOT!', 1.2);
-      this.onEvent({ type: 'shot' });
-      if (Math.hypot(this.me.pos.x, this.me.pos.z + PITCH.halfL) < 26) {
-        audio.roar(0.5);
+      const aimHigh = lookLift > 0.32;
+      this._flash(aimHigh ? 'TOP CORNER!' : 'SHOT!', 1.15);
+      this.onEvent({ type: 'shot', high: aimHigh, power });
+      if (goalDist < 30) audio.roar(0.55);
+      this.shotWasHigh = aimHigh;
+      this.shotPower = power;
+    } else {
+      const speed = clamp(9 + power * 8, 9, 23);
+      const lift = bestMate ? 1.1 + power * 1.3 : 1.2 + power * 2.4;
+      const dir = bestMate
+        ? new THREE.Vector3(
+            bestMate.avatar.group.position.x - this.me.pos.x,
+            0,
+            bestMate.avatar.group.position.z - this.me.pos.z
+          ).normalize()
+        : flat;
+      b.vel.set(dir.x * speed, lift, dir.z * speed);
+      if (bestMate) {
+        this.stats.passes++;
+        this._flash('PASS → ' + shortName(bestMate.name), 1.1);
+        bestMate.receive = 0.95;
+        this.onEvent({ type: 'pass' });
+      } else {
+        this.stats.shots++;
+        this._flash('SHOT!', 1.1);
+        this.onEvent({ type: 'shot', high: false, power });
       }
     }
+    audio.kick(clamp(power / 1.6, 0.2, 1));
     this.shotFrom = this.me.pos.clone();
   }
 
   /** Direction the camera is looking, flattened to the pitch. */
   _aimDirection() {
-    const dir = new THREE.Vector3(0, 0, -1);
-    dir.applyEuler(new THREE.Euler(this.pitch * 0.55, this.yaw, 0, 'YXZ'));
-    dir.y = 0;
+    const e = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(e);
+    // the reference keeps aiming mostly horizontal but lets the look angle
+    // lift or drop the shot, so keep a little of Y rather than flattening it
+    dir.y *= 0.55;
     if (dir.lengthSq() < 0.0001) dir.set(0, 0, -1);
-    return dir.normalize();
+    return dir;
   }
 
   update(dt, input) {
@@ -602,7 +710,12 @@ export class FootballGame {
     if (!this.practice) this.timeLeft = Math.max(0, this.timeLeft - dt);
     this.tackleCooldown = Math.max(0, (this.tackleCooldown || 0) - dt);
     this.skillCooldown = Math.max(0, (this.skillCooldown || 0) - dt);
+    if (this.skillAnim) {
+      this.skillAnim.t -= dt;
+      if (this.skillAnim.t <= 0) this.skillAnim = null;
+    }
     this.skillBoost = Math.max(0, (this.skillBoost || 0) - dt);
+    const sprintingNow = (input.sprint || this.sprintLock) && this.me.stamina > 0.06;
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
       if (this.bannerTimer <= 0) this.banner = '';
@@ -644,7 +757,7 @@ export class FootballGame {
   _updateMe(dt, input) {
     const me = this.me;
     const mv = input.moveVector();
-    const sprinting = input.sprint && me.stamina > 0.06;
+    const sprinting = (input.sprint || this.sprintLock) && me.stamina > 0.06;
     const base = PHYS.playerSpeed + (this.skillBoost > 0 ? 4 : 0);
     const speed = (sprinting ? PHYS.sprintSpeed : base) * (this.ball.owner === me ? 0.94 : 1);
     me.stamina = clamp(me.stamina + (sprinting ? -0.22 : 0.16) * dt, 0, 1);
@@ -701,6 +814,15 @@ export class FootballGame {
 
     this.avatars.forEach((p) => {
       const g = p.avatar.group;
+      p.stunned = Math.max(0, (p.stunned || 0) - dt);
+      if (p.stunned > 0) {
+        // beaten by a skill move: stand still, do not press
+        p.speed = damp(p.speed, 0, 6, dt);
+        p.avatar.animate(this.time + p.base.x, 0);
+        g.rotation.z = Math.sin(this.time * 9) * 0.06 * p.stunned;
+        return;
+      }
+      g.rotation.z = 0;
       const record = { home: p.home, avatar: { group: g }, isUser: false };
       let tx = p.base.x;
       let tz = p.base.z;
@@ -1048,6 +1170,8 @@ export class FootballGame {
   _resetPositions(kickoffDir = 1) {
     this.ball.reset(0, 0);
     this.me.pos.set(0, 0, PITCH.halfL * 0.3);
+    this.skillAnim = null;
+    this.lookBack = false;
     this.yaw = Math.PI;
     this.pitch = 0;
     this.teammates.forEach((p) => {
@@ -1060,6 +1184,10 @@ export class FootballGame {
     });
   }
 
+  _easeInOut(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
   _updateCamera(dt) {
     const me = this.me;
     const speed = me.speed;
@@ -1070,9 +1198,25 @@ export class FootballGame {
     this.camera.position.set(me.pos.x - fwd.x * 0.12, eyeY, me.pos.z - fwd.z * 0.12);
     this.camera.rotation.set(0, 0, 0);
     this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.yaw;
-    this.camera.rotation.x = this.pitch;
-    this.camera.rotation.z = Math.sin(this.time * 4.2) * 0.012 * Math.min(speed / 6, 1);
+    // look over your shoulder: swing the head round to check the press
+    if (this.lookBack) this.lookBackAt = Math.min(1, (this.lookBackAt || 0) + dt * 6);
+    else this.lookBackAt = Math.max(0, (this.lookBackAt || 0) - dt * 6);
+    const swing = this._easeInOut(this.lookBackAt) * Math.PI * 0.82;
+    this.camera.rotation.y = this.yaw + swing;
+    this.camera.rotation.x = this.pitch * (1 - this.lookBackAt * 0.5);
+    let lean = Math.sin(this.time * 4.2) * 0.012 * Math.min(speed / 6, 1);
+    if (this.skillAnim) {
+      const a = this.skillAnim;
+      const k = Math.max(0, a.t);
+      if (a.kind === 'stepover') lean += Math.sin(k * 34) * 0.16;
+      else if (a.kind === 'rainbow') lean += Math.sin((0.7 - k) * 5) * 0.2;
+      else if (a.kind === 'roulette') lean += (0.6 - k) * 1.2;
+    }
+    this.camera.rotation.z = lean;
+    // roulette spins the view right round, just like the reference move
+    if (this.skillAnim && this.skillAnim.kind === 'roulette') {
+      this.camera.rotation.y += (0.6 - this.skillAnim.t) * Math.PI * 1.5;
+    }
     this.camera.fov = lerp(this.camera.fov, 72 + (this.skillBoost > 0 ? 10 : 0), 0.1);
     this.camera.updateProjectionMatrix();
   }
@@ -1091,6 +1235,9 @@ export class FootballGame {
       hasBall: b.owner === me,
       charge: this.kickCharge,
       banner: this.banner,
+      lookBack: !!this.lookBack,
+      skillReady: (this.skillCooldown || 0) <= 0,
+      aimingHigh: this.pitch > 0.32,
       kickHint: b.owner === me ? 'HOLD & RELEASE' : dist2(b.pos.x, b.pos.z, me.pos.x, me.pos.z) < 2.3 ? 'TAP TO COLLECT' : 'GET TO THE BALL',
       paused: this.paused,
       finished: this.finished,

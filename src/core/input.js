@@ -27,12 +27,17 @@ export class Input {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.sprint = true;
       if (e.code === 'Space') this.actions.add('call');
       if (e.code === 'KeyC') this.actions.add('tackle');
-      if (e.code === 'KeyF' || e.code === 'KeyE') this._pressKick();
+      // F (or holding E as in the reference) powers up a kick
+      if (e.code === 'KeyF') this._pressKick();
       if (e.code === 'Digit1') this.actions.add('skill1');
       if (e.code === 'Digit2') this.actions.add('skill2');
       if (e.code === 'Digit3') this.actions.add('skill3');
+      // reference aliases: Q / E / R do the same three moves
+      if (e.code === 'KeyQ') this.actions.add('skill1');
+      if (e.code === 'KeyE') this._pressKick();
+      if (e.code === 'KeyR') this.actions.add('skill2');
       if (e.code === 'Escape' || e.code === 'KeyP') this.actions.add('pause');
-      if (e.code === 'KeyR') this.actions.add('primary');
+
     };
     const onKeyUp = (e) => {
       this.keys.delete(e.code);
@@ -40,16 +45,26 @@ export class Input {
       if (e.code === 'KeyF' || e.code === 'KeyE') this._releaseKick();
     };
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('keyup', (e) => {
+      onKeyUp(e);
+      if (e.code === 'KeyR' && this.actions.has('skill2')) this.actions.delete('skill2');
+    });
 
     // Mouse look (pointer lock on click for desktop)
     this.dom.addEventListener('mousedown', (e) => {
       if (!this.enabled || this.isTouch) return;
       if (e.button === 0) this._pressKick();
-      if (e.button === 2) this.actions.add('lookback');
+      if (e.button === 2) {
+        this.actions.add('lookBack');
+        this.lookBackHeld = true;
+      }
     });
     window.addEventListener('mouseup', (e) => {
       if (e.button === 0) this._releaseKick();
+      if (e.button === 2 && this.lookBackHeld) {
+        this.lookBackHeld = false;
+        this.actions.add('lookBackEnd');
+      }
     });
     this.dom.addEventListener('contextmenu', (e) => e.preventDefault());
     let dragging = false;

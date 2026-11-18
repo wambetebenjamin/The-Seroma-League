@@ -62,7 +62,10 @@
             <div class="skill-row" id="skillRow">
               <button class="pill" data-action="call">CALL</button>
               <button class="pill" data-action="tackle">TACKLE</button>
-              <button class="pill hidden" data-action="skill1">1</button>
+              <button class="pill skill-pill" data-action="skill1">STEP</button>
+              <button class="pill skill-pill" data-action="skill2">RAINBOW</button>
+              <button class="pill skill-pill" data-action="skill3">ROULETTE</button>
+              <button class="pill look-pill" data-action="lookBack">LOOK BACK</button>
             </div>
             <button id="kickBtn" class="kick-btn" aria-label="Kick / shoot">
               <span>SHOOT</span>
@@ -78,6 +81,17 @@
           </div>
           <div class="rhythm" id="rhythmBar"><i data-rhythm></i><span class="strike"></span></div>
           <button class="stroke-btn" id="strokeBtn">STROKE</button>
+        </div>
+
+        <div class="control-legend" id="controlLegend">
+          <div class="lrow"><kbd>W A S D</kbd><span>move</span></div>
+          <div class="lrow"><kbd>drag / mouse</kbd><span>look around</span></div>
+          <div class="lrow"><kbd>hold click / F</kbd><span>power up, release to kick where you look</span></div>
+          <div class="lrow"><kbd>Shift</kbd><span>sprint</span></div>
+          <div class="lrow"><kbd>Space</kbd><span>call for the ball</span></div>
+          <div class="lrow"><kbd>C</kbd><span>slide tackle</span></div>
+          <div class="lrow"><kbd>1 / 2 / 3</kbd><span>step-overs · rainbow flick · roulette</span></div>
+          <div class="lrow"><kbd>right click</kbd><span>look over your shoulder</span></div>
         </div>
 
         <div class="touch-stick" id="stickVisual" aria-hidden="true"><i></i></div>
@@ -185,13 +199,17 @@
               <div class="how-card">
                 <h3>⚽ Football</h3>
                 <ul>
-                  <li><b>Move</b> — left thumb stick / WASD</li>
-                  <li><b>Look</b> — drag right side / mouse</li>
-                  <li><b>Kick</b> — hold SHOOT (or F) to power up, release</li>
-                  <li>Aim at a teammate to pass · aim at the goal to shoot</li>
-                  <li><b>CALL</b> (Space) — ask for the ball</li>
-                  <li><b>TACKLE</b> (C) — slide in to win it back</li>
-                  <li><b>1 / 2 / 3</b> — step-overs, rainbow flick, roulette</li>
+                  <li><b>W A S D</b> (or left thumb) — move around the pitch</li>
+                  <li><b>Mouse / drag right side</b> — look around</li>
+                  <li><b>Hold click or F</b> — power up, release to kick where you look</li>
+                  <li>Look at the <b>top corner</b> and hold longer for a rising shot into that corner</li>
+                  <li>Look at a teammate and release to pass</li>
+                  <li><b>Shift</b> (or push the stick fully) — sprint</li>
+                  <li><b>Space / CALL</b> — call for the ball</li>
+                  <li><b>C / TACKLE</b> — slide in to win it back</li>
+                  <li><b>1 / 2 / 3</b> (or Q / E / R) — step-overs, rainbow flick, roulette</li>
+                  <li><b>Right click / LOOK BACK</b> — look over your shoulder at the press</li>
+                  <li><b>P / Esc</b> — pause</li>
                 </ul>
               </div>
               <div class="how-card">

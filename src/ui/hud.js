@@ -54,7 +54,9 @@ export class Hud {
       stick: $(root, '#stickVisual'),
       scoreboard: $(root, '.scoreboard'),
       chargeLabel: $(root, '#chargeMeter label'),
+      kickLabel: $(root, '#kickBtn span'),
     };
+    this.skillPills = [];
     this._bindControls();
     this._configureSport();
     this.lastBanner = '';
@@ -76,19 +78,19 @@ export class Hud {
       if (a === 'tackle') b.textContent = sport === 'basketball' ? 'BOX OUT' : sport === 'swimming' ? 'KICK' : 'TACKLE';
       if (a === 'call') b.textContent = sport === 'basketball' ? 'CALL' : sport === 'swimming' ? 'BREATHE' : 'CALL';
     });
-    e.kick.querySelector('span').textContent = sport === 'basketball' ? 'SHOOT' : 'SHOOT';
+    if (e.kickLabel) e.kickLabel.textContent = 'SHOOT';
     e.kick.dataset.sport = sport;
   }
 
   _bindControls() {
     const e = this.els;
     // football: extra skill buttons on the right rail for touch
-    if (this.sport === 'football') {
-      e.skillRow.querySelectorAll('[data-action="skill1"]').forEach((b) => {
-        b.classList.remove('hidden');
-        b.textContent = '1';
-      });
-    }
+    this.skillPills = Array.from(e.skillRow.querySelectorAll('.skill-pill'));
+    e.skillRow.querySelectorAll('.skill-pill, .look-pill').forEach((b) => {
+      b.classList.toggle('hidden', this.sport !== 'football' && b.classList.contains('skill-pill'));
+    });
+    e.legend = $(this.root, '#controlLegend');
+    if (this.sport !== 'football' && e.legend) e.legend.classList.add('hidden');
     const kick = e.kick;
     const down = (ev) => {
       ev.preventDefault();
@@ -112,7 +114,21 @@ export class Hud {
     e.pause.onclick = () => this.opts.onPause?.();
 
     e.skillRow.querySelectorAll('[data-action]').forEach((b) => {
-      b.onclick = () => this.opts.onAction?.(b.dataset.action);
+      const action = b.dataset.action;
+      if (action === 'lookBack') {
+        // hold to peek over your shoulder, exactly like right-click
+        b.onpointerdown = (ev) => {
+          ev.preventDefault();
+          this.opts.onAction?.('lookBack');
+        };
+        b.onpointerup = (ev) => {
+          ev.preventDefault();
+          this.opts.onAction?.('lookBackEnd');
+        };
+        b.onpointercancel = () => this.opts.onAction?.('lookBackEnd');
+        return;
+      }
+      b.onclick = () => this.opts.onAction?.(action);
     });
 
     e.strokeBtn.onpointerdown = (ev) => {
@@ -215,6 +231,16 @@ export class Hud {
     }
 
     if (h.hint) e.hint.textContent = h.hint;
+
+    // football: dim the skill pills while on cooldown, light the kick button
+    // when you are looking up at the top corner, and flag look-back
+    if (typeof h.skillReady === 'boolean' && this.skillPills.length) {
+      this.skillPills.forEach((b) => b.classList.toggle('dim', !h.skillReady));
+    }
+    if (typeof h.aimingHigh === 'boolean') e.kick.classList.toggle('aim-high', h.aimingHigh && h.hasBall);
+    if (typeof h.lookBack === 'boolean' && e.legend) {
+      e.legend.classList.toggle('faded', h.lookBack);
+    }
 
     if (h.banner !== undefined) {
       if (h.banner !== this.lastBanner) {

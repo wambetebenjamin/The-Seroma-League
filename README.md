@@ -44,9 +44,15 @@ Tails", the six values, the four-star ranking) come from
 Phone: left thumb = move, right thumb drag = look, **SHOOT** button = hold/release,
 plus action pills (CALL / TACKLE / skills).
 
-Desktop: **WASD** move · mouse drag look · **hold left click or F** to kick ·
-**Shift** sprint · **Space** call for the ball · **C** tackle · **1/2/3** skills ·
-**Esc/P** pause.
+Desktop (matching the reference game's control set): **WASD** move · mouse look ·
+**hold left click or F** to power up and kick where you look · **Shift** sprint ·
+**Space** call for the ball · **C** slide tackle · **1/2/3** (also **Q/E/R**)
+step-overs, rainbow flick and roulette · **right click** look over your shoulder ·
+**P/Esc** pause.
+
+Shots use the reference's aiming logic: look at the top corner of the goal and
+hold for a rising, corner-bound strike; look at a team-mate and the same button
+passes. Skill moves briefly beat your marker — mistime one and they nick it back.
 
 ## Tech
 
