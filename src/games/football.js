@@ -276,9 +276,21 @@ export class FootballGame {
       this.goals.push({ side: s, group: grp });
     });
 
-    // grandstands on both touchlines
-    addGrandstand(scene, 0, -halfL - 12, 0, 52, [this.homeTeam.colors.primary, '#f2f2f2']);
-    addGrandstand(scene, 0, halfL + 12, Math.PI, 52, [this.awayTeam.colors.primary, '#f2f2f2']);
+    // grandstands on both touchlines, each with a real 3D crowd
+    this.crowds = [];
+    const homeStand = addGrandstand(scene, 0, -halfL - 12, 0, 52, [
+      this.homeTeam.colors.primary,
+      this.homeTeam.colors.secondary || '#f2f2f2',
+    ], { rows: 5 });
+    const awayStand = addGrandstand(scene, 0, halfL + 12, Math.PI, 52, [
+      this.awayTeam.colors.primary,
+      this.awayTeam.colors.secondary || '#f2f2f2',
+    ], { rows: 5 });
+    this.crowds.push({ stand: homeStand, crowd: homeStand.userData.crowd, home: true });
+    this.crowds.push({ stand: awayStand, crowd: awayStand.userData.crowd, home: false });
+    // the touchline terraces get smaller crowds too
+    addGrandstand(scene, -halfW - 20, 0, Math.PI / 2, 26, [this.homeTeam.colors.primary, '#f2f2f2'], { rows: 4, density: 0.7 });
+    addGrandstand(scene, halfW + 20, 0, -Math.PI / 2, 26, [this.awayTeam.colors.primary, '#f2f2f2'], { rows: 4, density: 0.7 });
     // second tiers behind the goals
     addTerraces(scene, -halfW - 14, 0, { steps: 5, width: 26, rise: 0.8, run: 1.6 });
     addTerraces(scene, halfW + 14, 0, { steps: 5, width: 26, rise: 0.8, run: -1.6 });
@@ -719,6 +731,11 @@ export class FootballGame {
   update(dt, input) {
     if (this.paused || this.finished) return;
     this.time += dt;
+    if (this.crowds) {
+      for (const c of this.crowds) {
+        if (c.crowd) c.crowd.update(dt, this.time);
+      }
+    }
     if (!this.practice) this.timeLeft = Math.max(0, this.timeLeft - dt);
     this.tackleCooldown = Math.max(0, (this.tackleCooldown || 0) - dt);
     this.skillCooldown = Math.max(0, (this.skillCooldown || 0) - dt);
@@ -830,7 +847,7 @@ export class FootballGame {
       if (p.stunned > 0) {
         // beaten by a skill move: stand still, do not press
         p.speed = damp(p.speed, 0, 6, dt);
-        p.avatar.animate(this.time + p.base.x, 0);
+        p.avatar.animate(this.time + p.base.x, 0, dt);
         g.rotation.z = Math.sin(this.time * 9) * 0.06 * p.stunned;
         return;
       }
@@ -959,7 +976,7 @@ export class FootballGame {
       } else {
         p.speed = damp(p.speed, 0, 8, dt);
       }
-      p.avatar.animate(this.time + p.base.x, p.speed);
+      p.avatar.animate(this.time + p.base.x, p.speed, dt);
     });
 
     // AI defenders press the carrier and can win it back
@@ -1172,6 +1189,14 @@ export class FootballGame {
       this.score.away++;
     }
     audio.goal();
+    // the crowd reacts: their end erupts, the other end groans and sits down
+    if (this.crowds) {
+      for (const c of this.crowds) {
+        if (!c.crowd) continue;
+        if (c.home === homeScored) c.crowd.celebrate(4.5);
+        else c.crowd.setExcitement(0.12);
+      }
+    }
     this.bannerTimer = 3;
     this.banner = homeScored ? 'G O A L !  ' + this.homeTeam.name.toUpperCase() : 'CONCEDED';
     this.onScore({ ...this.score, homeScored });

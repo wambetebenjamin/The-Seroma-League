@@ -154,8 +154,20 @@ export class BasketballGame {
     scene.add(net);
 
     // surroundings
-    addGrandstand(scene, 0, COURT.halfL + 10, Math.PI, 34, [this.homeTeam.colors.primary, '#f2f2f2']);
-    addGrandstand(scene, -COURT.halfW - 10, 0, Math.PI / 2, 24, [this.awayTeam.colors.primary, '#2b2b2b']);
+    this.crowds = [];
+    const standA = addGrandstand(scene, 0, COURT.halfL + 10, Math.PI, 34, [
+      this.homeTeam.colors.primary,
+      this.homeTeam.colors.secondary || '#f2f2f2',
+    ], { rows: 4 });
+    const standB = addGrandstand(scene, -COURT.halfW - 10, 0, Math.PI / 2, 24, [
+      this.awayTeam.colors.primary,
+      '#2b2b2b',
+    ], { rows: 4, density: 0.75 });
+    const standC = addGrandstand(scene, COURT.halfW + 10, 0, -Math.PI / 2, 24, [
+      this.awayTeam.colors.primary,
+      this.awayTeam.colors.secondary || '#f2f2f2',
+    ], { rows: 4, density: 0.75 });
+    this.crowds = [standA, standB, standC].map((g) => g.userData.crowd).filter(Boolean);
     addClassroomBlock(scene, 28, -18, { w: 24, d: 9, h: 6.4, rot: -0.5 });
     addClassroomBlock(scene, -30, 16, { w: 20, d: 8, h: 6, rot: 0.6, wall: 'cream' });
     addTreeLine(scene, 0, 0, 46, 22);
@@ -341,6 +353,7 @@ export class BasketballGame {
   update(dt, input) {
     if (this.paused || this.finished) return;
     this.tick += dt;
+    if (this.crowds) for (const c of this.crowds) c.update(dt, this.tick);
     if (!this.practice) this.timeLeft = Math.max(0, this.timeLeft - dt);
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
@@ -489,6 +502,7 @@ export class BasketballGame {
     }
     audio.swish();
     audio.roar(0.7);
+    if (this.crowds) for (const c of this.crowds) c.celebrate(3);
     this._flash((green ? 'SWISH! +' : 'BUCKET! +') + pts + (three ? ' (3PT)' : ''), 1.8);
     this.onScore({ score: this.score, oppScore: this.oppScore, pts, green, three });
     this.onEvent({ type: 'basket', pts });
@@ -521,7 +535,7 @@ export class BasketballGame {
         g.rotation.y += (Math.atan2(-dir.x, -dir.z) - g.rotation.y) * Math.min(1, dt * 8);
         d.speed = sp;
       } else d.speed = 0;
-      d.avatar.animate(this.tick + i * 3, d.speed);
+      d.avatar.animate(this.tick + i * 3, d.speed, dt);
       if (i === 0 && g.position.distanceTo(this.me.pos) < 2.4 && this.ballState === 'held') {
         this.charge = Math.max(0, this.charge - dt * 0.45);
       }
@@ -543,7 +557,10 @@ export class BasketballGame {
   }
 
   _updateCamera(dt) {
-    const bob = Math.sin(this.tick * (7 + this.me.speed)) * 0.03;
+    // integrate the bob phase: `sin(tick * speed)` would jolt whenever the
+    // speed changed, which read as the camera shaking
+    this.bobPhase = (this.bobPhase || 0) + dt * (6 + Math.min(6, this.me.speed) * 1.4);
+    const bob = Math.sin(this.bobPhase) * 0.03 * Math.min(1, this.me.speed / 3);
     this.camera.rotation.order = 'YXZ';
     this.camera.position.set(this.me.pos.x, 1.68 + bob + Math.max(0, this.pitch) * 0.12, this.me.pos.z);
     this.camera.rotation.y = this.yaw;

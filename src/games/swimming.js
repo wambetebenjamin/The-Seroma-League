@@ -149,9 +149,10 @@ export class SwimmingGame {
       scene.add(block);
     }
 
-    // grandstand + campus dressing
-    addGrandstand(scene, 0, 12, Math.PI, 40, ['#1b6b9c', '#f2f2f2']);
-    addGrandstand(scene, -width / 2 - 12, -20, Math.PI / 2, 34, ['#c0392b', '#ffffff']);
+    // grandstands with real crowds + campus dressing
+    const gsA = addGrandstand(scene, 0, 12, Math.PI, 40, ['#1b6b9c', '#f2f2f2'], { rows: 4 });
+    const gsB = addGrandstand(scene, -width / 2 - 12, -20, Math.PI / 2, 34, ['#c0392b', '#ffffff'], { rows: 4 });
+    this.crowds = [gsA, gsB].map((g) => g.userData.crowd).filter(Boolean);
     addClassroomBlock(scene, 30, -12, { w: 22, d: 8, h: 6.2, rot: -0.4 });
     addClassroomBlock(scene, -32, 8, { w: 20, d: 8, h: 6, rot: 0.5, wall: 'cream' });
     addTreeLine(scene, 0, -20, 44, 20);
@@ -271,6 +272,7 @@ export class SwimmingGame {
   update(dt, input) {
     if (this.paused || this.finished) return;
     this.tick += dt;
+    if (this.crowds) for (const c of this.crowds) c.update(dt, this.tick);
     this.timeLeft = Math.max(0, this.timeLeft - dt);
     if (this.bannerTimer > 0) {
       this.bannerTimer -= dt;
@@ -307,6 +309,12 @@ export class SwimmingGame {
 
     this._updateRivals(dt);
     this._updateCamera(dt);
+
+    // the pool deck erupts as the race comes to the wall
+    if (this.crowds) {
+      const closing = Math.max(0, Math.min(1, (this.distance / RACE_LEN - 0.7) / 0.3));
+      for (const c of this.crowds) c.setExcitement(closing * 0.85);
+    }
 
     if (this.distance >= RACE_LEN) this._end();
 

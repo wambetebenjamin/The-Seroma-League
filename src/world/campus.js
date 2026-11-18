@@ -4,10 +4,12 @@
  * Everything is generated, so the whole game ships in a couple of MB.
  */
 import * as THREE from 'three';
-import { roofTexture, crowdTexture, bannerTexture, dirtTexture } from '../core/textures.js';
+import { roofTexture, bannerTexture, dirtTexture } from '../core/textures.js';
 import { rand, pick } from '../core/engine.js';
 import { SCHOOL } from '../data/seroma.js';
 import { PALETTE, stdMat, glossyMat, addContactShadow, addHedge } from '../core/style.js';
+import { addCrowd } from './crowd.js';
+import { IS_TOUCH } from '../core/engine.js';
 
 const MAT = {};
 function mat(key, make) {
@@ -177,11 +179,12 @@ export function addTerraces(scene, x, z, { steps = 6, width = 34, rot = 0, rise 
   return grp;
 }
 
-/** Grandstand with a painted crowd. */
-export function addGrandstand(scene, x, z, rot = 0, length = 46, colors = ['#c0392b', '#f2f2f2']) {
+/**
+ * Grandstand with a real 3D crowd.
+ * Returns { group, crowd } so the game can make the crowd celebrate.
+ */
+export function addGrandstand(scene, x, z, rot = 0, length = 46, colors = ['#c0392b', '#f2f2f2'], opts = {}) {
   const grp = new THREE.Group();
-  const tex = crowdTexture(colors[0], colors[1]);
-  tex.repeat.set(length / 22, 1);
 
   const steps = 7;
   for (let i = 0; i < steps; i++) {
@@ -193,14 +196,20 @@ export function addGrandstand(scene, x, z, rot = 0, length = 46, colors = ['#c03
     step.receiveShadow = true;
     grp.add(step);
   }
-  const crowd = new THREE.Mesh(
-    new THREE.PlaneGeometry(length, 4.2),
-    new THREE.MeshStandardMaterial({ map: tex, roughness: 1, transparent: false })
-  );
-  crowd.position.set(0, 3.6, 0.15);
-  crowd.rotation.x = -0.42;
-  crowd.rotation.z = 0;
-  grp.add(crowd);
+  // spectators: instanced 3D people sitting on the steps
+  const crowd = addCrowd(grp, {
+    x: 0,
+    z: 0.15,
+    length: length * 0.96,
+    rows: opts.rows || 5,
+    rotY: 0,
+    colors,
+    rowRise: 0.8,
+    rowRun: 1.12,
+    seatY: 1.05,
+    // phones get a thinner crowd so the frames stay high
+    density: (opts.density || 0.86) * (IS_TOUCH ? 0.62 : 1),
+  });
   const roof = new THREE.Mesh(new THREE.BoxGeometry(length + 3, 0.25, 9), greenRoof());
   roof.position.set(0, 8.2, -3.2);
   roof.rotation.x = -0.12;
@@ -223,6 +232,7 @@ export function addGrandstand(scene, x, z, rot = 0, length = 46, colors = ['#c03
   grp.position.set(x, 0, z);
   grp.rotation.y = rot;
   scene.add(grp);
+  grp.userData.crowd = crowd;
   return grp;
 }
 
