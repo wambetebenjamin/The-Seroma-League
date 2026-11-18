@@ -1289,3 +1289,31 @@ body {
 .pill.look-pill { font-size: 8.5px; letter-spacing: 0.06em; padding: 7px 10px; border-color: rgba(242,193,78,.45); }
 .pill:disabled, .pill.dim { opacity: 0.35; }
 .kick-btn.aim-high { box-shadow: 0 10px 24px rgba(0,0,0,.45), 0 0 0 3px rgba(242,193,78,.75) inset; }
+
+/* The illustrated campus gallery (stylized 3D renders) */
+.photo-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.photo-strip img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(242, 193, 78, 0.22);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+}
+.render-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.72;
+  border-left: 2px solid rgba(242, 193, 78, 0.5);
+  padding-left: 9px;
+}
+@media (max-width: 520px) {
+  .photo-strip { grid-template-columns: repeat(2, 1fr); }
+  .photo-strip img:first-child { grid-column: span 2; aspect-ratio: 16 / 9; }
+}

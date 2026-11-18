@@ -60,7 +60,7 @@ function buildHome() {
     const b = document.createElement('button');
     b.className = 'sport-card';
     b.innerHTML = `
-      <img src="./${s.photo}" alt="${s.name} at Seroma" loading="lazy" />
+      <img src="./${s.photo}" alt="${s.photoAlt || s.name + ' at Seroma'}" loading="lazy" />
       <div class="sport-scrim"></div>
       <div class="sport-inner">
         <div class="icon">${s.icon}</div>

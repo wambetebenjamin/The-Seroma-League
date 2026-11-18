@@ -248,6 +248,7 @@ export const SPORTS = [
     icon: '⚽',
     blurb: 'See the pitch through your own eyes. Look where you want to shoot.',
     photo: 'img/football.jpg',
+    photoAlt: 'Football at Seroma, 3D render',
     venue: 'Jubilee Pitch',
   },
   {
@@ -257,6 +258,7 @@ export const SPORTS = [
     icon: '🏀',
     blurb: 'Hold, aim at the rim, and let it fly over the defenders.',
     photo: 'img/basketball.jpg',
+    photoAlt: 'Basketball at Seroma, 3D render',
     venue: 'Seroma Court',
   },
   {
@@ -266,6 +268,7 @@ export const SPORTS = [
     icon: '🏊',
     blurb: 'Tap in rhythm, keep your lane, and chase down the leaders.',
     photo: 'img/swimming.jpg',
+    photoAlt: 'Swimming at Seroma, 3D render',
     venue: 'Aquatics Centre',
   },
 ];
