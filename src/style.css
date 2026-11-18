@@ -1317,3 +1317,21 @@ body {
   .photo-strip { grid-template-columns: repeat(2, 1fr); }
   .photo-strip img:first-child { grid-column: span 2; aspect-ratio: 16 / 9; }
 }
+
+/* Result screen: 3D scene banner that mirrors the outcome */
+.result-hero {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  background: rgba(255, 255, 255, 0.04);
+}
+.result-hero img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  object-fit: cover;
+  object-position: center 38%;
+}
+@media (max-width: 520px) {
+  .result-hero img { aspect-ratio: 16 / 9; }
+}

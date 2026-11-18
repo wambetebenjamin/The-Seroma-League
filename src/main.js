@@ -113,6 +113,7 @@ const ROLE_LABELS = ['Forward', 'Winger', 'Midfielder', 'Defender', 'Goalkeeper'
 
 function openPlayers(sport) {
   app.sport = sport;
+  app.matchCount = (app.matchCount || 0) + 1;
   document.body.dataset.sport = sport;
   app.awayTeam = TEAMS.find((t) => t.id !== app.homeTeam)?.id || 'theos';
   const meta = SPORTS.find((s) => s.id === sport);
@@ -328,6 +329,18 @@ function renderResult(r) {
   const stats = document.getElementById('resultStats');
   const home = teamById(app.homeTeam);
   const away = teamById(app.awayTeam);
+
+  // the 3D celebration/loss art matches the mood of the result
+  const photo = document.getElementById('resultPhoto');
+  if (photo) {
+    const won = r.result === 'win';
+    const pool = won ? ['celebration', 'ballgames'] : ['stadium', 'swimmers'];
+    const pick = pool[(app.matchCount || 0) % pool.length];
+    photo.src = `./img/${pick}.jpg`;
+    photo.alt = won
+      ? 'Seroma team celebrating with the trophy, 3D render'
+      : 'Seroma scenes after the final whistle, 3D render';
+  }
 
   if (sport === 'football') {
     kicker.textContent = 'FULL TIME · SEROMA LEAGUE';
