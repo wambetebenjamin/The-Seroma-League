@@ -158,7 +158,20 @@ export function makeNameTag(name, color = '#ffffff', bg = 'rgba(9,20,14,.72)') {
   ctx.fillStyle = bg;
   const r = 18;
   ctx.beginPath();
-  ctx.roundRect(4, 8, 248, 48, r);
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(4, 8, 248, 48, r);
+  } else {
+    // older Safari: approximate the rounded label with plain arcs
+    ctx.moveTo(4 + r, 8);
+    ctx.lineTo(252 - r, 8);
+    ctx.quadraticCurveTo(252, 8, 252, 8 + r);
+    ctx.lineTo(252, 56 - r);
+    ctx.quadraticCurveTo(252, 56, 252 - r, 56);
+    ctx.lineTo(4 + r, 56);
+    ctx.quadraticCurveTo(4, 56, 4, 56 - r);
+    ctx.lineTo(4, 8 + r);
+    ctx.quadraticCurveTo(4, 8, 4 + r, 8);
+  }
   ctx.fill();
   ctx.fillStyle = color;
   ctx.font = 'bold 26px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';

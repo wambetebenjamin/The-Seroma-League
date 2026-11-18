@@ -1225,3 +1225,25 @@ body {
   margin: 0 0 10px;
   min-height: 15px;
 }
+
+/* Portrait phones: keep the pitch view clear and the buttons thumb-sized */
+@media (max-width: 520px) {
+  #hud { padding: calc(8px + var(--safe-t)) 9px calc(9px + var(--safe-b)); }
+  .scoreboard { padding: 6px 9px; gap: 7px; border-radius: 12px; }
+  .clock { padding: 7px 9px; border-radius: 10px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .hud-left { max-width: 40vw; }
+  .meter .bar { width: 32vw; }
+  .meter label { width: 46px; font-size: 8px; }
+  .kick-btn { width: 84px; height: 84px; }
+  .pill { padding: 7px 10px; font-size: 9.5px; }
+  .reticle { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+  .banner { top: 14%; font-size: clamp(15px, 5vw, 24px); padding: 8px 12px; }
+  .swim-hud { gap: 8px; }
+  .stroke-btn { padding: 14px; font-size: 13px; }
+}
+@media (max-height: 430px) and (orientation: landscape) {
+  .hud-bottom { align-items: center; }
+  .kick-btn { width: 78px; height: 78px; }
+  .reticle { opacity: 0.6; }
+}
