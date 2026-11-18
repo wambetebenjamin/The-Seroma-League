@@ -34,7 +34,7 @@ import {
   addPalm,
   addEucalyptus,
 } from '../world/campus.js';
-import { Avatar, makeNameTag, shortName, alternateKit } from '../world/players.js';
+import { Avatar, makeNameTag, shortName } from '../world/players.js';
 import { teamById, squadFor, SCHOOL } from '../data/seroma.js';
 import { audio } from '../core/audio.js';
 
@@ -340,24 +340,16 @@ export class FootballGame {
     this.opponents = [];
     const scene = this.scene;
 
-    // five team-mates alongside you, never a duplicate of you and never a
-    // duplicate of each other (the same name twice on one pitch looks broken)
-    const homeSquad = squadFor(this.homeTeam.id, 8, this.homeName)
+    const homeSquad = squadFor(this.homeTeam.id, 6, this.homeName)
       .filter((n) => n !== this.homeName)
       .slice(0, 5);
-    const awaySquad = squadFor(this.awayTeam.id, 8, this.awayName)
+    const awaySquad = squadFor(this.awayTeam.id, 6, this.awayName)
       .filter((n) => n !== this.awayName)
       .slice(0, 5);
-    // if two clubs share a kit colour, the second side plays in an alternate strip
-    const sameKit = this.homeTeam.colors.primary === this.awayTeam.colors.primary;
-    const awayAlt = sameKit ? alternateKit(this.awayTeam, 3) : null;
 
-    // You: the body is hidden because the camera sits in your eyes, but the
-    // record still carries your kit and your number
+    // You (invisible body — camera sits in your eyes)
     this.me = {
       team: this.homeTeam,
-      kit: this.homeTeam.colors,
-      number: 10,
       name: this.homeName,
       pos: new THREE.Vector3(0, 0, PITCH.halfL * 0.42),
       heading: Math.PI,
@@ -419,7 +411,6 @@ export class FootballGame {
         number: i + 2,
         isKeeper: i === 4,
         sport: 'football',
-        alt: awayAlt,
       });
       a.setPosition(p[0], 0, p[1]);
       scene.add(a.group);
@@ -812,7 +803,6 @@ export class FootballGame {
     const goalZ = -PITCH.halfL;
     const dx = 0 - this.me.pos.x;
     const dz = goalZ - this.me.pos.z;
-    // avatars face -Z, so a heading of atan2(-dx, -dz) points at the target
     const want = Math.atan2(-dx, -dz);
     const diff = Math.abs(angleDelta(this.yaw, want));
     if (diff < 0.42) {

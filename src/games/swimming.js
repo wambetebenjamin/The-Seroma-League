@@ -15,7 +15,6 @@ import {
 import { makeCloudSky, makeRenderLights, applyRenderLook, addHills, addHedge } from '../core/style.js';
 import { waterTexture, bannerTexture, crowdTexture } from '../core/textures.js';
 import { addTreeLine, addGrandstand, addClassroomBlock, addSchoolSign, addPalm } from '../world/campus.js';
-import { Avatar } from '../world/players.js';
 import { teamById, squadFor } from '../data/seroma.js';
 import { audio } from '../core/audio.js';
 
@@ -177,37 +176,34 @@ export class SwimmingGame {
     return -((LANES * LANE_W) / 2) + LANE_W / 2 + i * LANE_W;
   }
 
-  /**
-   * The other four lanes are real Seroma swimmers: full avatars in the water,
-   * capped, face down and stroking, with their clubs split between the two
-   * sides so the heat looks like a proper school meet.
-   */
   _buildRivals() {
-    const homeNames = squadFor(this.homeTeam.id, 8, this.homeName).filter((n) => n !== this.homeName);
-    const awayNames = squadFor(this.oppTeam.id, 8);
-    let hi = 0;
-    let ai = 0;
+    const names = squadFor(this.oppTeam.id, 4);
     for (let i = 0; i < LANES; i++) {
       if (i === this.lane) {
         this.rivals.push(null);
         continue;
       }
-      const fromHome = i % 2 === 0;
-      const team = fromHome ? this.homeTeam : this.oppTeam;
-      const pool = fromHome ? homeNames : awayNames;
-      const name = pool[(fromHome ? hi++ : ai++) % Math.max(1, pool.length)] || 'SEROMA SWIMMER';
-      const av = new Avatar({ team, name, number: i + 2, sport: 'swimming' });
-      // face down the pool, body level with the surface
-      av.group.rotation.set(-Math.PI / 2, 0, 0);
-      av.group.position.set(this._laneX(i), 0.16, 2.6);
-      this.scene.add(av.group);
+      const color = i % 2 === 0 ? this.oppTeam.colors.primary : this.homeTeam.colors.primary;
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 10, 8),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: 0.6 })
+      );
+      const body = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.22, 1.0, 4, 10),
+        new THREE.MeshStandardMaterial({ color: 0x8d5b35, roughness: 0.7 })
+      );
+      body.rotation.x = Math.PI / 2;
+      const grp = new THREE.Group();
+      grp.add(cap);
+      cap.position.set(0, 0, -0.6);
+      grp.add(body);
+      grp.position.set(this._laneX(i), 0.12, 2.6);
+      this.scene.add(grp);
       this.rivals.push({
-        group: av.group,
-        avatar: av,
-        team,
-        name,
+        group: grp,
+        name: names[i % names.length] || 'SEROMA',
         progress: 0,
-        pace: rand(1.28, 1.6),
+        pace: rand(1.28, 1.58),
         wobble: rand(0, 6.28),
       });
     }
@@ -331,15 +327,8 @@ export class SwimmingGame {
       if (!r) return;
       r.progress += r.pace * dt * (0.96 + Math.sin(this.tick * 0.6 + r.wobble) * 0.06);
       r.group.position.z = 2.6 - r.progress;
-      r.group.position.y = 0.16 + Math.sin(this.tick * 6 + r.wobble) * 0.05;
-      // roll with the stroke instead of spinning: they are face down, so the
-      // body twists about the swim axis (local Z) rather than world Z
+      r.group.position.y = 0.1 + Math.sin(this.tick * 6 + r.wobble) * 0.04;
       r.group.rotation.z = Math.sin(this.tick * 5 + r.wobble) * 0.16;
-      r.group.rotation.y = Math.sin(this.tick * 5 + r.wobble) * 0.1;
-      if (r.avatar) {
-        const strokeSpeed = 4 + r.pace * 4;
-        r.avatar.animate(this.tick + r.wobble, strokeSpeed, dt);
-      }
     });
   }
 
