@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b2b1c" />
+    <meta
+      name="description"
+      content="The Seroma League — a POV sports game set at Seroma Christian High School, Mukono. Football, basketball and swimming."
+    />
+    <meta property="og:title" content="The Seroma League" />
+    <meta property="og:description" content="Play the Seroma League POV sports game: football, basketball and swimming." />
+    <meta property="og:image" content="./img/hero.jpg" />
+    <title>The Seroma League · Seroma Christian High School</title>
+    <link rel="preload" as="image" href="./img/hero.jpg" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- 3D canvas mounts here -->
+      <div id="stage"></div>
+
+      <!-- In-game HUD -->
+      <div id="hud" class="hidden">
+        <div class="hud-top">
+          <div class="scoreboard">
+            <div class="side home">
+              <span class="dot" data-home-dot></span>
+              <span class="tname" data-home-name>GAUCHO</span>
+            </div>
+            <div class="nums"><b data-home-score>0</b><i>:</i><b data-away-score>0</b></div>
+            <div class="side away">
+              <span class="tname" data-away-name>THEOS</span>
+              <span class="dot" data-away-dot></span>
+            </div>
+          </div>
+          <div class="clock"><span data-clock>3:00</span></div>
+          <button class="icon-btn" id="pauseBtn" aria-label="Pause">⏸</button>
+        </div>
+
+        <div class="hud-center">
+          <div id="banner" class="banner"></div>
+          <div id="aimReticle" class="reticle"><span></span></div>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="hud-left">
+            <div class="meter stamina">
+              <label>STAMINA</label>
+              <div class="bar"><i data-stamina></i></div>
+            </div>
+            <div class="meter charge hidden" id="chargeMeter">
+              <label>POWER</label>
+              <div class="bar charge-bar"><i data-charge></i><span class="green-zone" data-green-zone></span></div>
+            </div>
+            <div class="hint" data-hint></div>
+          </div>
+
+          <div class="hud-right">
+            <div class="skill-row" id="skillRow">
+              <button class="pill" data-action="call">CALL</button>
+              <button class="pill" data-action="tackle">TACKLE</button>
+              <button class="pill skill-pill" data-action="skill1">STEP</button>
+              <button class="pill skill-pill" data-action="skill2">RAINBOW</button>
+              <button class="pill skill-pill" data-action="skill3">ROULETTE</button>
+              <button class="pill look-pill" data-action="lookBack">LOOK BACK</button>
+            </div>
+            <button id="kickBtn" class="kick-btn" aria-label="Kick / shoot">
+              <span>SHOOT</span>
+              <em></em>
+            </button>
+          </div>
+        </div>
+
+        <div class="swim-hud hidden" id="swimHud">
+          <div class="lane-progress">
+            <div class="lane-track"><i data-progress></i></div>
+            <div class="lane-labels"><span data-lap-label>0 / 50 m</span><span data-pos-label>P1</span></div>
+          </div>
+          <div class="rhythm" id="rhythmBar"><i data-rhythm></i><span class="strike"></span></div>
+          <button class="stroke-btn" id="strokeBtn">STROKE</button>
+        </div>
+
+        <div class="control-legend" id="controlLegend">
+          <div class="lrow"><kbd>W A S D</kbd><span>move</span></div>
+          <div class="lrow"><kbd>drag / mouse</kbd><span>look around</span></div>
+          <div class="lrow"><kbd>hold click / F</kbd><span>power up, release to kick where you look</span></div>
+          <div class="lrow"><kbd>Shift</kbd><span>sprint</span></div>
+          <div class="lrow"><kbd>Space</kbd><span>call for the ball</span></div>
+          <div class="lrow"><kbd>C</kbd><span>slide tackle</span></div>
+          <div class="lrow"><kbd>1 / 2 / 3</kbd><span>step-overs · rainbow flick · roulette</span></div>
+          <div class="lrow"><kbd>right click</kbd><span>look over your shoulder</span></div>
+        </div>
+
+        <div class="touch-stick" id="stickVisual" aria-hidden="true"><i></i></div>
+      </div>
+
+      <!-- Menus -->
+      <div id="ui" class="ui">
+        <section class="screen active" id="screen-home">
+          <div class="home-hero">
+            <img src="./img/hero.jpg" alt="Seroma athletes gathering on the games field, rendered in 3D" />
+            <div class="scrim"></div>
+            <div class="home-content">
+              <div class="crest">
+                <div class="crest-inner">SC<span>HS</span></div>
+              </div>
+              <p class="kicker">SEROMA CHRISTIAN HIGH SCHOOL · MUKONO</p>
+              <h1>THE <em>SEROMA</em> LEAGUE</h1>
+              <p class="tagline">Heads But Not Tails · Step into the boots, the sneakers and the lanes.</p>
+              <div class="home-actions">
+                <button class="btn primary" id="playNow">PLAY NOW ⚡</button>
+                <button class="btn ghost" id="howBtn">HOW TO PLAY</button>
+              </div>
+              <div class="home-meta">
+                <span>12 clubs</span><span>6 award races</span><span>3 sports</span>
+              </div>
+            </div>
+          </div>
+          <div class="home-scroll">
+            <div class="cards-row" id="sportCards"></div>
+            <div class="split">
+              <div class="panel campus-panel">
+                <h2>The Campus</h2>
+                <p>
+                  Seroma Christian High School sits on the rolling hills of Mukono, Uganda, founded in
+                  2002 by Lt. Col. Robert and Mrs Margaret Sekidde. Wisdom Hall, the terracotta blocks,
+                  the stone terraces and the Jubilee Pitch are all here — recreated in 3D.
+                </p>
+                <div class="photo-strip">
+                  <img src="./img/wisdom-hall.jpg" alt="Wisdom Hall at Seroma, 3D render" loading="lazy" />
+                  <img src="./img/stadium.jpg" alt="Seroma stadium, grandstand and running track, 3D render" loading="lazy" />
+                  <img src="./img/aerial.jpg" alt="Aerial view of the Seroma campus, 3D render" loading="lazy" />
+                  <img src="./img/campus.jpg" alt="Seroma students together on campus, 3D render" loading="lazy" />
+                  <img src="./img/ballgames.jpg" alt="Ball games day at Seroma, 3D render" loading="lazy" />
+                  <img src="./img/celebration.jpg" alt="Seroma team lifting the trophy, 3D render" loading="lazy" />
+                  <img src="./img/swimmers.jpg" alt="Seroma swimmers with their medals, 3D render" loading="lazy" />
+                </div>
+                <p class="muted render-note">
+                  Every scene in the league is illustrated as a stylized 3D render of Seroma —
+                  the orange blocks, green roofs, Wisdom Hall, the track and the pool.
+                </p>
+                <div class="facts" id="campusFacts"></div>
+              </div>
+              <div class="panel">
+                <h2>The Clubs</h2>
+                <p class="muted">Every club from the Seroma League voting poll. Pick your badge.</p>
+                <div class="club-list" id="clubList"></div>
+              </div>
+            </div>
+            <div class="panel wide">
+              <h2>Awards Night</h2>
+              <p class="muted">
+                The Seroma League poll decides who takes the season honours. These are the running
+                vote shares in the game — vote for real on the official poll.
+              </p>
+              <div class="awards" id="awardsBoard"></div>
+              <a class="btn ghost small" id="pollLink" target="_blank" rel="noopener">OPEN THE OFFICIAL POLL ↗</a>
+            </div>
+            <footer class="foot">
+              <p>Fan-made game for The Seroma League · <span id="year"></span></p>
+              <p class="tiny">
+                All artwork in the league is original stylized 3D illustration of Seroma Christian High
+                School, made to celebrate the school community.
+              </p>
+            </footer>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-players">
+          <div class="sheet">
+            <header class="sheet-head">
+              <button class="back" data-back>←</button>
+              <div>
+                <h2 id="playersTitle">Choose your player</h2>
+                <p class="muted" id="playersSub">Seroma League squads from the official poll</p>
+              </div>
+            </header>
+            <div class="sheet-body">
+              <div class="mode-toggle" id="modeToggle">
+                <button class="mode-btn on" data-mode="match">MATCH</button>
+                <button class="mode-btn" data-mode="practice">PRACTICE</button>
+              </div>
+              <p class="muted mode-note" id="modeNote"></p>
+              <div class="team-picker" id="teamPicker"></div>
+              <div class="squad-grid" id="squadGrid"></div>
+            </div>
+            <footer class="sheet-foot">
+              <div class="selection" id="selectionSummary"></div>
+              <button class="btn primary" id="startMatch">KICK OFF</button>
+            </footer>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-how">
+          <div class="sheet">
+            <header class="sheet-head">
+              <button class="back" data-back>←</button>
+              <div>
+                <h2>How to play</h2>
+                <p class="muted">Same controls on phone and desktop</p>
+              </div>
+            </header>
+            <div class="sheet-body how-body">
+              <div class="how-card">
+                <h3>⚽ Football</h3>
+                <ul>
+                  <li><b>W A S D</b> (or left thumb) — move around the pitch</li>
+                  <li><b>Mouse / drag right side</b> — look around</li>
+                  <li><b>Hold click or F</b> — power up, release to kick where you look</li>
+                  <li>Look at the <b>top corner</b> and hold longer for a rising shot into that corner</li>
+                  <li>Look at a teammate and release to pass</li>
+                  <li><b>Shift</b> (or push the stick fully) — sprint</li>
+                  <li><b>Space / CALL</b> — call for the ball</li>
+                  <li><b>C / TACKLE</b> — slide in to win it back</li>
+                  <li><b>1 / 2 / 3</b> (or Q / E / R) — step-overs, rainbow flick, roulette</li>
+                  <li><b>Right click / LOOK BACK</b> — look over your shoulder at the press</li>
+                  <li><b>P / Esc</b> — pause</li>
+                </ul>
+              </div>
+              <div class="how-card">
+                <h3>🏀 Basketball</h3>
+                <ul>
+                  <li><b>Move</b> — left thumb stick / WASD</li>
+                  <li><b>Aim</b> at the rim, then <b>hold & release</b> in the green zone</li>
+                  <li>Step behind the arc for a 3-pointer</li>
+                  <li>Perfect release adds a bonus point</li>
+                </ul>
+              </div>
+              <div class="how-card">
+                <h3>🏊 Swimming</h3>
+                <ul>
+                  <li><b>Tap STROKE</b> (or Space) when the marker enters the bright band</li>
+                  <li>Perfect rhythm keeps your speed up</li>
+                  <li><b>KICK</b> (C) for an underwater burst at the cost of stamina</li>
+                  <li>Drift left/right with the stick to hold your lane</li>
+                </ul>
+              </div>
+              <div class="how-card">
+                <h3>📱 Tips</h3>
+                <ul>
+                  <li>Landscape gives you a wider pitch view</li>
+                  <li>Tap ⏸ any time to pause or quit</li>
+                  <li>Sound on for the stadium roar</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-result">
+          <div class="sheet result">
+            <div class="result-hero">
+              <img id="resultPhoto" src="./img/celebration.jpg" alt="" />
+            </div>
+            <div class="result-body">
+              <p class="kicker" id="resultKicker">FULL TIME</p>
+              <h2 id="resultTitle">Victory</h2>
+              <div class="result-score" id="resultScore"></div>
+              <div class="result-stats" id="resultStats"></div>
+              <div class="result-actions">
+                <button class="btn primary" id="rematch">PLAY AGAIN</button>
+                <button class="btn ghost" id="toMenu">MAIN MENU</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="screen-pause">
+          <div class="modal">
+            <h2>Paused</h2>
+            <p class="muted">Seroma League</p>
+            <div class="modal-actions">
+              <button class="btn primary" id="resume">RESUME</button>
+              <button class="btn ghost" id="quitMatch">QUIT TO MENU</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="toast" class="toast"></div>
+      <div id="loader" class="loader hidden"><div class="ball"></div><p>Warming up…</p></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
