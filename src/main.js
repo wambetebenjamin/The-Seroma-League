@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { Input } from './core/input.js';
 import { audio } from './core/audio.js';
+import { portraitURL } from './ui/portrait.js';
 import { hideLoader, showLoader, showToast } from './ui/hud.js';
 import { Hud } from './ui/hud.js';
 import {
@@ -169,16 +170,28 @@ function buildPlayerPicker() {
   grid.innerHTML = '';
   const squad = squadFor(app.homeTeam, 5);
   if (!app.homePlayer || !squad.includes(app.homePlayer)) app.homePlayer = squad[0];
+  const team = teamById(app.homeTeam);
   squad.forEach((name, i) => {
     const card = document.createElement('button');
     card.className = 'player-card' + (name === app.homePlayer ? ' on' : '');
+    const role = ROLE_LABELS[i % ROLE_LABELS.length];
+    const portrait = portraitURL({
+      name,
+      team,
+      sport: app.sport,
+      width: 260,
+      height: 320,
+    });
     card.innerHTML = `
       ${name === app.homePlayer ? '<span class="badge">YOU</span>' : ''}
-      <div class="pc-top">
+      <div class="pc-portrait">
+        <img src="${portrait}" alt="3D illustration of ${name}" width="260" height="320" loading="lazy" />
         <span class="num">${i + 1}</span>
       </div>
-      <div class="pname">${name}</div>
-      <div class="role">${ROLE_LABELS[i % ROLE_LABELS.length]}</div>`;
+      <div class="pc-meta">
+        <div class="pname">${name}</div>
+        <div class="role">${role}</div>
+      </div>`;
     card.onclick = () => {
       app.homePlayer = name;
       audio.click();
@@ -192,7 +205,6 @@ function buildPlayerPicker() {
   if (!app.awayPlayer || !awaySquad.includes(app.awayPlayer))
     app.awayPlayer = awaySquad[Math.floor(Math.random() * awaySquad.length)];
 
-  const team = teamById(app.homeTeam);
   const sel = document.getElementById('selectionSummary');
   sel.innerHTML = `<span>${team.name} · ${team.coach}</span><b>${app.homePlayer}</b>vs ${away.name} · ${away.coach}`;
 }

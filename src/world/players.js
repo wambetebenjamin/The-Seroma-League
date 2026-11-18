@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { initials } from '../data/seroma.js';
 import { addContactShadow } from '../core/style.js';
+import { jerseyTexture } from '../core/textures.js';
 
 const SKIN = [0x8a5a34, 0x6f4426, 0x9c6a3f, 0x5c3720, 0x7d5030, 0xa8734a];
 const HAIR = [0x171210, 0x1f1712, 0x2a1d15, 0x120e0c];
@@ -105,8 +106,12 @@ export class Avatar {
     L.add(collar);
 
     if (!S) {
-      // number on the back
-      const num = new THREE.Mesh(g('num', () => new THREE.PlaneGeometry(0.3, 0.26)), trim);
+      // the player's shirt number, on the back of the kit
+      const numTex = jerseyTexture(kit.primary, kit.secondary, this.number || 7);
+      const num = new THREE.Mesh(
+        g('num', () => new THREE.PlaneGeometry(0.3, 0.26)),
+        new THREE.MeshStandardMaterial({ map: numTex, roughness: 0.86 })
+      );
       num.position.set(0, 1.3, 0.235);
       L.add(num);
       // side stripe on the shorts

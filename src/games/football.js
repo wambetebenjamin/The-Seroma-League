@@ -384,8 +384,14 @@ export class FootballGame {
       });
       a.setPosition(p[0], 0, p[1]);
       scene.add(a.group);
-      const tag = makeNameTag(shortName(name), '#ffe8e8', 'rgba(60,10,15,.72)');
+      const captain = name === this.awayName;
+      const tag = makeNameTag(
+        shortName(name) + (captain ? ' ★' : ''),
+        captain ? '#141014' : '#ffe8e8',
+        captain ? 'rgba(242,193,78,.95)' : 'rgba(60,10,15,.72)'
+      );
       tag.position.y = 2.15;
+      tag.scale.set(captain ? 1.75 : 1.5, captain ? 0.44 : 0.38, 1);
       a.group.add(tag);
       const rec = {
         avatar: a,
