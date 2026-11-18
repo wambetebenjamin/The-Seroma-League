@@ -23,7 +23,7 @@ import {
   addSchoolSign,
   addPalm,
 } from '../world/campus.js';
-import { Avatar, makeNameTag, shortName } from '../world/players.js';
+import { Avatar, makeNameTag, shortName, alternateKit } from '../world/players.js';
 import { teamById, squadFor } from '../data/seroma.js';
 import { audio } from '../core/audio.js';
 
@@ -183,23 +183,83 @@ export class BasketballGame {
     scene.add(banner);
   }
 
+  /**
+   * A real 3x3: two team-mates in your kit and three opponents in theirs, all
+   * with names from the poll squads. Nobody duplicates you or anybody else, and
+   * if both clubs wear the same colour the visitors switch to an alt strip.
+   */
   _spawnPlayers() {
     this.defenders = [];
+    this.mates = [];
+    const sameKit = this.homeTeam.colors.primary === this.awayTeam.colors.primary;
+    const awayAlt = sameKit ? alternateKit(this.awayTeam, 5) : null;
+
+    const awayNames = squadFor(this.awayTeam.id, 8, this.awayName)
+      .filter((n) => n !== this.awayName)
+      .slice(0, 3);
+    const homeNames = squadFor(this.homeTeam.id, 8, this.homeName)
+      .filter((n) => n !== this.homeName)
+      .slice(0, 2);
+
+    // your two team-mates play the wings so the court reads as a real possession
+    const mateSpots = [
+      [-5.2, 0.4],
+      [5.4, -1.1],
+    ];
+    homeNames.forEach((name, i) => {
+      const p = mateSpots[i];
+      const a = new Avatar({ team: this.homeTeam, name, number: i + 6, sport: 'basketball' });
+      a.setPosition(p[0], 0, p[1]);
+      a.setHeading(Math.PI);
+      this.scene.add(a.group);
+      const tag = makeNameTag(shortName(name), '#eaffef', 'rgba(12,72,44,.75)');
+      tag.position.y = 2.1;
+      a.group.add(tag);
+      this.mates.push({
+        avatar: a,
+        base: new THREE.Vector3(p[0], 0, p[1]),
+        speed: 0,
+        role: 'wing',
+        side: i ? 1 : -1,
+      });
+    });
+
+    // three defenders: two on the perimeter, one shading the rim
     const positions = [
-      [-4.5, -7.4],
-      [4.2, -8.6],
+      [-4.6, -7.2],
+      [4.3, -8.4],
+      [0.2, -10.6],
     ];
     positions.forEach((p, i) => {
-      const name = squadFor(this.awayTeam.id, 4)[i + 1] || this.awayName;
-      const a = new Avatar({ team: this.awayTeam, name, number: i + 4, sport: 'basketball' });
+      const name = awayNames[i] || this.awayName;
+      const a = new Avatar({
+        team: this.awayTeam,
+        name,
+        number: i + 4,
+        sport: 'basketball',
+        alt: awayAlt,
+      });
       a.setPosition(p[0], 0, p[1]);
+      a.setHeading(0);
       this.scene.add(a.group);
       const tag = makeNameTag(shortName(name), '#ffe8e8', 'rgba(90,12,20,.75)');
       tag.position.y = 2.1;
       a.group.add(tag);
-      this.defenders.push({ avatar: a, base: new THREE.Vector3(p[0], 0, p[1]), speed: 0 });
+      this.defenders.push({
+        avatar: a,
+        base: new THREE.Vector3(p[0], 0, p[1]),
+        speed: 0,
+        anchor: i === 2 ? 'rim' : 'perimeter',
+      });
     });
-    this.me = { pos: new THREE.Vector3(0, 0, 2.5), speed: 0, stamina: 1 };
+    this.me = {
+      pos: new THREE.Vector3(0, 0, 2.5),
+      speed: 0,
+      stamina: 1,
+      name: this.homeName,
+      kit: this.homeTeam.colors,
+      number: 10,
+    };
   }
 
   _buildBall() {
@@ -388,6 +448,7 @@ export class BasketballGame {
     this.me.speed = move.length() * speed;
 
     this._updateBall(dt);
+    this._updateMates(dt);
     this._updateDefenders(dt);
     if (!this.practice) this._updateOpponentScoring(dt);
     this._updateCamera(dt);
@@ -525,12 +586,35 @@ export class BasketballGame {
     }, 700);
   }
 
+  _updateMates(dt) {
+    (this.mates || []).forEach((m, i) => {
+      const g = m.avatar.group;
+      // drift toward a spot level with you, one on each wing
+      const tx = clamp(this.me.pos.x + m.side * 4.6, -COURT.halfW + 1, COURT.halfW - 1);
+      const tz = clamp(this.me.pos.z - 2.2 - i * 0.6, HOOP.backboardZ + 3, COURT.halfL - 1);
+      const dir = new THREE.Vector3(tx - g.position.x, 0, tz - g.position.z);
+      const len = dir.length();
+      if (len > 0.25) {
+        dir.divideScalar(len);
+        const sp = Math.min(3.2, len * 1.9);
+        g.position.x += dir.x * sp * dt;
+        g.position.z += dir.z * sp * dt;
+        g.rotation.y += (Math.atan2(-dir.x, -dir.z) - g.rotation.y) * Math.min(1, dt * 7);
+        m.speed = sp;
+      } else m.speed = 0;
+      m.avatar.animate(this.tick + i * 2.3, m.speed, dt);
+    });
+  }
+
   _updateDefenders(dt) {
     this.defenders.forEach((d, i) => {
       const g = d.avatar.group;
       const offset = i === 0 ? 1.8 : -1.9;
       const tx = clamp(this.me.pos.x + offset, -COURT.halfW, COURT.halfW);
-      const tz = clamp(this.me.pos.z - 1.9, HOOP.backboardZ + 2.5, COURT.halfL);
+      // the third defender protects the rim instead of shadowing you
+      const tz = d.anchor === 'rim'
+        ? clamp(HOOP.backboardZ + 3.1, HOOP.backboardZ + 2.5, COURT.halfL)
+        : clamp(this.me.pos.z - 1.9, HOOP.backboardZ + 2.5, COURT.halfL);
       const dir = new THREE.Vector3(tx - g.position.x, 0, tz - g.position.z);
       const len = dir.length();
       if (len > 0.2) {

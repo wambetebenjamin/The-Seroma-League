@@ -141,11 +141,10 @@ function buildHome() {
       <img src="./${s.photo}" alt="${s.photoAlt || s.name + ' at Seroma'}" loading="lazy" />
       <div class="sport-scrim"></div>
       <div class="sport-inner">
-        <div class="icon">${s.icon}</div>
         <h3>${s.name}</h3>
         <p>${s.tagline}</p>
-        <p style="opacity:.8;margin-top:4px">${s.blurb}</p>
-        <div class="go">PLAY ${s.name.toUpperCase()} →</div>
+        <p style="opacity:.72;margin-top:4px">${s.blurb}</p>
+        <div class="go">PLAY ${s.name.toUpperCase()}</div>
       </div>`;
     b.onclick = () => openPlayers(s.id);
     cards.appendChild(b);
@@ -166,9 +165,7 @@ function buildHome() {
   if (tabs) {
     tabs.innerHTML = VENUES.map(
       (v) =>
-        `<button class="venue-btn" data-venue="${v.id}"${v.sport ? ` data-sport="${v.sport}"` : ''}>
-          <span aria-hidden="true">${v.icon}</span>${v.name}
-        </button>`
+        `<button class="venue-btn" data-venue="${v.id}"${v.sport ? ` data-sport="${v.sport}"` : ''}>${v.name}</button>`
     ).join('');
     // keep the highlight in sync whenever the bar is rebuilt
     tabs.querySelectorAll('[data-venue]').forEach((b) => {
@@ -192,7 +189,7 @@ function buildHome() {
   const strip = document.getElementById('renderStrip');
   if (strip) {
     strip.innerHTML =
-      `<h3>CAMPUS RENDERS</h3><div class="thumb-list">` +
+      `<h2>Campus renders</h2><p class="muted">Tap a scene to set the backdrop.</p><div class="thumb-list">` +
       GALLERY.map(
         (g) =>
           `<button class="thumb" data-gallery="${g.id}" title="${g.label}">
@@ -303,7 +300,6 @@ function renderQuick() {
   if (sports && !sports.dataset.built) {
     sports.innerHTML = SPORTS.map(
       (sp) => `<button class="quick-sport" data-sport="${sp.id}">
-        <span class="qs-emoji">${sp.icon}</span>
         <b>${sp.name}</b>
         <span>${sp.tagline}</span>
       </button>`
@@ -387,7 +383,7 @@ function renderQuick() {
           ${crestSVG(t, { size: 56 })}
           <div>
             <b>${t.name}</b>
-            <span>${sp.icon} ${sp.name} · ${quick.mode === 'practice' ? 'Practice' : 'Match'} · ${t.coach}</span>
+            <span>${sp.name} · ${quick.mode === 'practice' ? 'Practice' : 'Match'} · ${t.coach}</span>
           </div>
         </div>`;
     } else preview.innerHTML = '';
@@ -703,10 +699,10 @@ function renderResult(r) {
       r.result === 'win'
         ? `<b>Player of the match.</b> ${s2.goals} goal${s2.goals === 1 ? '' : 's'} from ${s2.shots} shot${
             s2.shots === 1 ? '' : 's'
-          } — ${s2.possession ?? 0}% of the ball was yours.`
+          }. ${s2.possession ?? 0}% of the ball was yours.`
         : r.result === 'draw'
         ? `<b>Honours even.</b> You kept ${s2.possession ?? 0}% of possession and topped out at ${s2.topSpeedKmh ?? 0} km/h.`
-        : `<b>Plenty to build on.</b> ${s2.onTarget ?? 0} of ${s2.shots} shots found the target — the crowd wants more.`
+        : `<b>Plenty to build on.</b> ${s2.onTarget ?? 0} of ${s2.shots} shots found the target. The crowd wants more.`
     );
   } else if (sport === 'basketball') {
     kicker.textContent = 'FINAL BUZZER · SEROMA COURT';
@@ -725,7 +721,7 @@ function renderResult(r) {
     verdict(
       r.result === 'win'
         ? `<b>Bucket after bucket.</b> ${bst.green ?? 0} of your releases dropped through the green.`
-        : `<b>Keep shooting.</b> Best run ${r.best} — the net will open up.`
+        : `<b>Keep shooting.</b> Best run ${r.best}. The net will open up.`
     );
   } else {
     kicker.textContent = 'RACE COMPLETE · SEROMA AQUATICS';
@@ -744,7 +740,7 @@ function renderResult(r) {
     verdict(
       acc >= 60
         ? `<b>Beautiful rhythm.</b> ${acc}% of your strokes hit the sweet spot.`
-        : `<b>Tidy up the timing.</b> ${r.perfect} of ${r.strokes} strokes were perfect — aim for the middle of the cycle.`
+        : `<b>Tidy up the timing.</b> ${r.perfect} of ${r.strokes} strokes were perfect. Aim for the middle of the cycle.`
     );
   }
   app.lastResult = r;

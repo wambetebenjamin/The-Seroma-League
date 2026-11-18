@@ -69,7 +69,19 @@ npm run build    # static build in dist/
 `smoke.mjs` runs the three game engines headlessly with a stubbed renderer:
 
 ```bash
-node smoke.mjs
+node smoke.mjs          # gameplay logic, 22 checks
+node pitch.test.mjs     # who is on each pitch and what kit they wear, 31 checks
+node quick.test.mjs     # club crests, ratings and venue backdrops, 61 checks
+node visual.mjs         # avatar/materials look, 44 checks
+node portraits.test.mjs # player illustrations, 18 checks
+node tools/html-check.mjs
+```
+
+`tools/scene-shot.mjs` renders any pitch to a PNG with a software rasteriser, so
+the 3D scenes can be inspected without a GPU:
+
+```bash
+node tools/scene-shot.mjs football tools/shot.png
 ```
 
 ## Credits
