@@ -10,6 +10,10 @@ import {
   TEAMS,
   SPORTS,
   SCHOOL,
+  VENUES,
+  GALLERY,
+  venueFor,
+  venueForSport,
   CAMPUS_FACTS,
   POLL_CATEGORIES,
   squadFor,
@@ -44,10 +48,12 @@ function show(screenId) {
   const el = document.getElementById(screenId);
   if (el) el.classList.add('active');
   app.ui.classList.remove('hidden');
+  showBackdrop();
 }
 function showHud() {
   app.ui.classList.add('hidden');
   app.hud.classList.remove('hidden');
+  hideBackdrop();
   document.body.classList.add('match-on');
 }
 function hideHud() {
@@ -56,6 +62,72 @@ function hideHud() {
 }
 function toast(msg) {
   showToast(msg);
+}
+
+/* ------------------------------- backdrop --------------------------------- */
+/**
+ * The menu sits on a live campus backdrop: a full-bleed 3D render that
+ * cross-fades when you pick a sport or tap a venue tab. Health-checks the page
+ * first, so if an image ever 404s the fallback hero render steps in instead of
+ * leaving a hole in the layout.
+ */
+const backdrop = {
+  el: null,
+  a: null,
+  b: null,
+  front: null,
+  current: null,
+  broken: new Set(),
+  checked: new Map(),
+};
+
+function backdropReady(src) {
+  return new Promise((resolve) => {
+    if (backdrop.checked.has(src)) return resolve(backdrop.checked.get(src));
+    const img = new Image();
+    img.onload = () => {
+      backdrop.checked.set(src, true);
+      resolve(true);
+    };
+    img.onerror = () => {
+      backdrop.checked.set(src, false);
+      backdrop.broken.add(src);
+      resolve(false);
+    };
+    img.src = src;
+  });
+}
+
+async function setBackdrop(photo, { immediate = false } = {}) {
+  const src = `./${photo}`;
+  if (!backdrop.el) {
+    backdrop.el = document.getElementById('backdrop');
+    backdrop.a = document.getElementById('bdA');
+    backdrop.b = document.getElementById('bdB');
+    backdrop.front = backdrop.a;
+  }
+  if (!backdrop.el || backdrop.current === src) return;
+  backdrop.current = src;
+  const ok = await backdropReady(src);
+  const finalSrc = ok ? src : './img/hero.jpg';
+  const next = backdrop.front === backdrop.a ? backdrop.b : backdrop.a;
+  const cur = backdrop.front;
+  next.style.backgroundImage = `url("${finalSrc}")`;
+  next.classList.add('on');
+  if (immediate) next.style.transition = 'none';
+  // force the layer to paint before we fade the old one out
+  void next.offsetWidth;
+  next.style.transition = '';
+  cur.classList.remove('on');
+  backdrop.front = next;
+  document.body.dataset.venueSrc = finalSrc;
+}
+
+function hideBackdrop() {
+  if (backdrop.el) backdrop.el.classList.add('hidden');
+}
+function showBackdrop() {
+  if (backdrop.el) backdrop.el.classList.remove('hidden');
 }
 
 /* --------------------------------- home ---------------------------------- */
@@ -90,6 +162,58 @@ function buildHome() {
       `<div class="club"><i style="background:${t.colors.primary}"></i>${t.name}<span style="opacity:.5;font-weight:500"> · ${(SQUADS[t.id] || []).length}</span></div>`
   ).join('');
 
+  const tabs = document.getElementById('venueTabs');
+  if (tabs) {
+    tabs.innerHTML = VENUES.map(
+      (v) =>
+        `<button class="venue-btn" data-venue="${v.id}"${v.sport ? ` data-sport="${v.sport}"` : ''}>
+          <span aria-hidden="true">${v.icon}</span>${v.name}
+        </button>`
+    ).join('');
+    // keep the highlight in sync whenever the bar is rebuilt
+    tabs.querySelectorAll('[data-venue]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.venue === activeVenue);
+    });
+    tabs.querySelectorAll('[data-venue]').forEach((b) => {
+      b.onclick = () => {
+        audio.click();
+        const v = venueFor(b.dataset.venue);
+        setVenue(v.id);
+        // a venue that hosts a sport also pre-selects it, so the tab does real work
+        if (v.sport) {
+          app.sport = v.sport;
+          document.body.dataset.sport = v.sport;
+          buildHome();
+        }
+      };
+    });
+  }
+
+  const strip = document.getElementById('renderStrip');
+  if (strip) {
+    strip.innerHTML =
+      `<h3>CAMPUS RENDERS</h3><div class="thumb-list">` +
+      GALLERY.map(
+        (g) =>
+          `<button class="thumb" data-gallery="${g.id}" title="${g.label}">
+            <img src="./${g.photo}" alt="${g.alt}" loading="lazy" />
+            <span>${g.label}</span>
+          </button>`
+      ).join('') +
+      `</div>`;
+    strip.querySelectorAll('[data-gallery]').forEach((b) => {
+      b.onclick = () => {
+        audio.click();
+        const g = GALLERY.find((x) => x.id === b.dataset.gallery);
+        if (g) {
+          setBackdrop(g.photo);
+          strip.querySelectorAll('.thumb').forEach((t) => t.classList.toggle('on', t === b));
+          caption(g.label, '');
+        }
+      };
+    });
+  }
+
   const awards = document.getElementById('awardsBoard');
   awards.innerHTML = POLL_CATEGORIES.map((cat) => {
     const max = Math.max(...cat.nominees.map((n) => n.votes));
@@ -112,6 +236,24 @@ function buildHome() {
 
   document.getElementById('pollLink').href = SCHOOL.poll;
   document.getElementById('year').textContent = new Date().getFullYear();
+}
+
+/* --------------------------------- venues --------------------------------- */
+let activeVenue = 'jubilee';
+
+function caption(name, line) {
+  const el = document.getElementById('venueCaption');
+  if (el) el.textContent = line ? `${name} · ${line}` : name;
+}
+
+function setVenue(id, { silent = false } = {}) {
+  const v = venueFor(id);
+  activeVenue = v.id;
+  setBackdrop(v.photo);
+  document.querySelectorAll('#venueTabs .venue-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.venue === v.id);
+  });
+  if (!silent) caption(v.name, v.line);
 }
 
 /* -------------------------------- quick play ------------------------------- */
@@ -171,6 +313,8 @@ function renderQuick() {
       b.onclick = () => {
         audio.click();
         quick.sport = b.dataset.sport;
+        // the campus behind the drawer changes to the venue for that sport
+        setVenue(venueForSport(quick.sport).id, { silent: true });
         setQuickStep('club');
       };
     });
@@ -696,6 +840,7 @@ function bind() {
 /* ---------------------------------- boot --------------------------------- */
 function boot() {
   buildHome();
+  setVenue(venueForSport(app.sport).id);
   bind();
   show('screen-home');
   // warm the menu image
